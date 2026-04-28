@@ -1,0 +1,223 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  max-width: 100vw;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+body {
+  background: linear-gradient(
+    180deg,
+    #fafbff 0%,
+    #f5f3ff 50%,
+    #fafbff 100%
+  );
+  display: flex;
+  flex-direction: column;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  color: #1f2937;
+}
+
+/* 深色模式 */
+.dark body {
+  background: linear-gradient(
+    180deg,
+    #0f172a 0%,
+    #1e1b4b 50%,
+    #0f172a 100%
+  );
+  color: #f1f5f9;
+}
+
+/* 深色模式背景颜色 */
+.dark .bg-white {
+  background-color: #1e293b;
+}
+
+.dark .bg-gray-50 {
+  background-color: #0f172a;
+}
+
+.dark .bg-gray-100 {
+  background-color: #334155;
+}
+
+.dark .bg-gray-200 {
+  background-color: #475569;
+}
+
+/* 深色模式文字颜色 */
+.dark h1,
+.dark h2,
+.dark h3,
+.dark h4,
+.dark h5,
+.dark h6 {
+  color: #f8fafc;
+}
+
+.dark p,
+.dark li {
+  color: #e2e8f0;
+}
+
+.dark .text-gray-900,
+.dark .text-gray-800 {
+  color: #f8fafc;
+}
+
+.dark .text-gray-700,
+.dark .text-gray-600 {
+  color: #cbd5e1;
+}
+
+.dark .text-gray-500,
+.dark .text-gray-400 {
+  color: #94a3b8;
+}
+
+.dark .text-blue-700 {
+  color: #93c5fd;
+}
+
+.dark .text-purple-700 {
+  color: #c4b5fd;
+}
+
+.dark .text-green-700,
+.dark .text-emerald-700 {
+  color: #86efac;
+}
+
+.dark .text-red-600,
+.dark .text-red-700 {
+  color: #fca5a5;
+}
+
+/* 深色模式边框 */
+.dark .border-gray-100 {
+  border-color: #334155;
+}
+
+.dark .border-gray-200 {
+  border-color: #475569;
+}
+
+/* 深色模式表单元素 */
+.dark input,
+.dark textarea,
+.dark select {
+  background-color: #1e293b;
+  color: #f8fafc;
+  border-color: #475569;
+}
+
+.dark input:focus,
+.dark textarea:focus,
+.dark select:focus {
+  background-color: #1e293b;
+  border-color: #8b5cf6;
+  color: #f8fafc;
+}
+
+/* 深色模式下的半透明白色背景 */
+.bg-white-opacity-80 {
+  background-color: rgba(255, 255, 255, 0.8);
+}
+
+.dark .bg-white-opacity-80 {
+  background-color: rgba(30, 41, 59, 0.9);
+}
+
+/* 深色模式阴影 */
+.dark .shadow-sm {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+}
+
+.dark .shadow-md {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
+}
+
+.dark .shadow-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
+}
+
+/* 深色模式搜索弹窗 */
+.dark .bg-white.rounded-2xl {
+  background-color: #1e293b;
+}
+
+/* 深色模式下的表格 */
+.dark table {
+  color: #f1f5f9;
+}
+
+.dark thead {
+  background-color: #0f172a;
+}
+
+.dark tbody tr:hover {
+  background-color: #334155;
+}
+
+/* 深色模式渐变文字 */
+.dark .bg-clip-text {
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 平滑滚动 */
+html {
+  scroll-behavior: smooth;
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* 确保明亮模式下 svg 图标是灰色的 */
+svg text-gray-500 {
+  color: #6b7280;
+}
+
+svg text-gray-600 {
+  color: #4b5563;
+}

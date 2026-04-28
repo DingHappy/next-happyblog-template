@@ -1,0 +1,59 @@
+# Dependencies
+node_modules
+
+# Build outputs
+.next
+out
+dist
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Version control
+.git
+.gitignore
+.github
+.gitattributes
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Uploads
+public/uploads/*
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Cache
+.cache
+.turbo
+
+# Testing
+coverage
+*.lcov
+
+# Misc
+*.md
+!.github/README.md
+docs

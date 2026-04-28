@@ -1,0 +1,230 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Post {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  excerpt     String
+  content     String
+  categoryId  String?
+  coverImage  String?
+  published   Boolean  @default(true)
+  isPublic    Boolean  @default(true) // 文章是否公开可见
+  isPinned    Boolean  @default(false) // 文章是否置顶
+  scheduledAt DateTime? // 定时发布时间
+  viewCount   Int      @default(0)
+  likeCount   Int      @default(0)
+  sourceHash  String?  // 用于知识库同步的内容哈希检测（SHA256 截断）
+  sourcePath  String?  @unique // 知识库同步的源文件相对路径（同步匹配键）
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tags        Tag[]
+  comments    Comment[]
+  views       PostView[]
+  versions    PostVersion[]
+  category    Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  subscriptions CommentSubscription[]
+
+  @@index([title])
+  @@index([slug])
+  @@index([categoryId])
+  @@index([createdAt])
+  @@index([sourceHash])
+  @@index([sourcePath])
+  @@index([published, isPublic, createdAt])
+  @@index([published, isPublic, isPinned, createdAt])
+  @@index([viewCount])
+  @@index([updatedAt])
+}
+
+model PostView {
+  id        String   @id @default(cuid())
+  postId    String
+  createdAt DateTime @default(now())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([createdAt])
+  @@index([postId, createdAt])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  postId    String
+  parentId  String?  // 父评论 ID，用于回复功能
+  author    String
+  email     String?
+  content   String
+  approved  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  parent    Comment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   Comment[] @relation("CommentReplies")
+
+  @@index([postId])
+  @@index([parentId])
+  @@index([createdAt])
+  @@index([approved])
+  @@index([approved, createdAt])
+  @@index([email])
+}
+
+model Tag {
+  id    String @id @default(cuid())
+  name  String @unique
+  slug  String @unique
+  posts Post[]
+
+  @@index([slug])
+}
+
+model Category {
+  id          String     @id @default(cuid())
+  name        String
+  slug        String     @unique
+  description String?
+  color       String     @default("#6366f1")
+  postCount   Int        @default(0)
+  order       Int        @default(0)
+  parentId    String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  parent      Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children    Category[] @relation("CategoryHierarchy")
+  posts       Post[]
+
+  @@index([slug])
+  @@index([parentId])
+  @@index([createdAt])
+  @@unique([name, parentId])
+}
+
+model Media {
+  id        String   @id @default(cuid())
+  filename  String
+  url       String   @unique
+  size      Int
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model User {
+  id          String   @id @default(cuid())
+  username    String   @unique
+  email       String?  @unique
+  password    String   // bcrypt hash
+  role        String   @default("author") // superadmin, admin, author
+  displayName String?
+  avatar      String?
+  bio         String?
+  lastLoginAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  sessions    Session[]
+  auditLogs   AuditLog[]
+
+  @@index([username])
+  @@index([email])
+  @@index([role])
+}
+
+model Session {
+  id          String   @id @default(cuid())
+  userId      String?
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([expiresAt])
+  @@index([userId])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  action      String   // create, update, delete, login, logout
+  resource    String   // post, comment, category, tag, user, setting
+  resourceId  String?
+  oldData     String?  // JSON
+  newData     String?  // JSON
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([resource])
+  @@index([createdAt])
+  @@index([action, resource, createdAt])
+  @@index([ipAddress])
+}
+
+model CommentSubscription {
+  id          String   @id @default(cuid())
+  postId      String
+  email       String
+  confirmed   Boolean  @default(false)
+  confirmToken String? @unique
+  createdAt   DateTime @default(now())
+  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([email])
+  @@unique([postId, email])
+}
+
+model FriendLink {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  url         String   @unique
+  description String?
+  avatar      String?
+  isVisible   Boolean  @default(true)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isVisible])
+  @@index([order])
+}
+
+model PostVersion {
+  id          String   @id @default(cuid())
+  postId      String
+  title       String
+  slug        String
+  excerpt     String?
+  content     String
+  categoryId  String?
+  coverImage  String?
+  tags        String?  // JSON string of tag names
+  version     Int
+  createdAt   DateTime @default(now())
+  
+  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([version])
+  @@index([createdAt])
+  @@unique([postId, version])
+}
+
+model Setting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String?
+  type      String   @default("string") // string, number, boolean, json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([key])
+}
