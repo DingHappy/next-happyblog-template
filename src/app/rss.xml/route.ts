@@ -42,14 +42,16 @@ export async function GET() {
     `;
   }).join('');
 
-  const xml = `<?xml version="1.0" encoding="UTF-8" ?>
-    <rss version="2.0">
+   const xml = `<?xml version="1.0" encoding="UTF-8" ?>
+    <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
       <channel>
         <title>${escapeXml(siteConfig.name)}</title>
         <link>${escapeXml(absoluteUrl('/'))}</link>
+        <atom:link href="${escapeXml(absoluteUrl('/rss.xml'))}" rel="self" type="application/rss+xml" />
         <description>${escapeXml(siteConfig.description)}</description>
         <language>${escapeXml(siteConfig.language)}</language>
         <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
+        <generator>Next.js Blog Template</generator>
         ${items}
       </channel>
     </rss>`;

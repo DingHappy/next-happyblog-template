@@ -9,9 +9,9 @@ import { slugify } from '@/lib/slug';
 
 const KNOWLEDGE_BASE_PATH =
   process.env.KNOWLEDGE_BASE_PATH ||
-  path.join(process.cwd(), 'knowledge', 'docs');
+  path.join(/*turbopackIgnore: true*/ process.cwd(), 'knowledge', 'docs');
 
-const UPLOADS_DIR = path.join(process.cwd(), 'public', 'uploads', 'synced');
+const UPLOADS_DIR = path.join(/*turbopackIgnore: true*/ process.cwd(), 'public', 'uploads', 'synced');
 const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.avif']);
 
 interface MarkdownFile {

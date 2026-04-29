@@ -45,14 +45,49 @@ model Post {
 }
 
 model PostView {
-  id        String   @id @default(cuid())
-  postId    String
-  createdAt DateTime @default(now())
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  id          String   @id @default(cuid())
+  postId      String?
+  sessionId   String?
+  ip          String?
+  userAgent   String?
+  referer     String?
+  path        String?
+  duration    Int      @default(0) // 停留时长（秒）
+  createdAt   DateTime @default(now())
+  post        Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@index([postId])
+  @@index([sessionId])
   @@index([createdAt])
   @@index([postId, createdAt])
+  @@index([path])
+}
+
+model AnalyticsSession {
+  id          String   @id @default(cuid())
+  visitorId   String   // 匿名访客 ID（cookie）
+  ip          String?
+  userAgent   String?
+  referer     String?
+  entryPath   String?
+  exitPath    String?
+  duration    Int      @default(0) // 会话总时长
+  pageViews   Int      @default(1)
+  country     String?
+  region      String?
+  city        String?
+  device      String?  // desktop, mobile, tablet
+  browser     String?
+  os          String?
+  isBot       Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([visitorId])
+  @@index([createdAt])
+  @@index([country])
+  @@index([device])
+  @@index([isBot])
 }
 
 model Comment {

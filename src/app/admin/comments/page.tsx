@@ -40,7 +40,7 @@ export default async function AdminComments() {
     },
   });
 
-  const pendingCount = comments.filter(c => !c.approved).length;
+  const pendingCount = comments.filter((comment) => !comment.approved).length;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 transition-colors flex">

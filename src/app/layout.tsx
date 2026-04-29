@@ -3,6 +3,9 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import BackToTop from "@/components/BackToTop";
+import MobileBottomNav from "@/components/MobileBottomNav";
+import AnalyticsProvider from "@/components/AnalyticsProvider";
 import { FeedbackProvider } from "@/components/FeedbackProvider";
 import { siteUrl } from "@/lib/site";
 import { siteConfig } from "@/config/site";
@@ -60,9 +63,13 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-gray-50 dark:bg-slate-950 text-gray-800 dark:text-slate-100">
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <FeedbackProvider>
-          <Navbar />
-          <main className="flex-1">{children}</main>
-          <Footer />
+          <AnalyticsProvider>
+            <Navbar />
+            <main className="flex-1 pb-20 lg:pb-0">{children}</main>
+            <Footer />
+            <BackToTop />
+            <MobileBottomNav />
+          </AnalyticsProvider>
         </FeedbackProvider>
       </body>
     </html>

@@ -4,6 +4,7 @@ import type { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { requireAuth } from '@/lib/auth';
 import { siteConfig } from '@/config/site';
+import { WebSiteJsonLd, OrganizationJsonLd } from '@/components/JsonLd';
 
 export const dynamic = 'force-dynamic';
 
@@ -183,8 +184,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
   const totalCategories = countCategories(categories);
 
   return (
-    <div className="max-w-[1400px] mx-auto px-4 py-6 md:py-8">
-      <div className="grid grid-cols-1 md:grid-cols-[240px_minmax(0,1fr)] lg:grid-cols-[240px_minmax(0,1fr)_300px] gap-4 lg:gap-6">
+    <>
+      <WebSiteJsonLd />
+      <OrganizationJsonLd />
+      <div className="max-w-[1400px] mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8">
+      <div className="grid grid-cols-1 md:grid-cols-[240px_minmax(0,1fr)] lg:grid-cols-[240px_minmax(0,1fr)_300px] gap-3 md:gap-4 lg:gap-6">
         
         {/* 左侧边栏 */}
         <aside className="-order-1 hidden md:block">
@@ -560,5 +564,6 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
          </aside>
       </div>
     </div>
+    </>
   );
 }

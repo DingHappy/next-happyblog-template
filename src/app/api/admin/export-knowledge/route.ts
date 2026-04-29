@@ -7,7 +7,7 @@ import path from 'path';
 const KNOWLEDGE_BASE_PATH =
   process.env.EXPORT_KNOWLEDGE_PATH ||
   process.env.KNOWLEDGE_BASE_PATH ||
-  path.join(process.cwd(), 'knowledge', 'docs');
+  path.join(/*turbopackIgnore: true*/ process.cwd(), 'knowledge', 'docs');
 
 // 确保目录存在
 async function ensureDir(dir: string) {

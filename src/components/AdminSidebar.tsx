@@ -8,6 +8,7 @@ export default function AdminSidebar() {
 
   const menuItems = [
     { href: '/admin/dashboard', label: '控制台', icon: '📊' },
+    { href: '/admin/analytics', label: '访问统计', icon: '📈' },
     { href: '/admin/posts', label: '文章管理', icon: '📝' },
     { href: '/admin/categories', label: '分类管理', icon: '📁' },
     { href: '/admin/tags', label: '标签管理', icon: '🏷️' },

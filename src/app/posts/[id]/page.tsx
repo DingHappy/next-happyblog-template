@@ -14,7 +14,9 @@ import TableOfContents from '@/components/TableOfContents';
 import PostMeta from '@/components/PostMeta';
 import LikeButton from '@/components/LikeButton';
 import ReadingProgress from '@/components/ReadingProgress';
-import { ArticleJsonLd } from '@/components/JsonLd';
+import ShareButtons from '@/components/ShareButtons';
+import { ArticleJsonLd, BreadcrumbItem } from '@/components/JsonLd';
+import Breadcrumb from '@/components/Breadcrumb';
 import { extractHeadings } from '@/lib/markdown';
 import { requireAuth } from '@/lib/auth';
 import { siteConfig } from '@/config/site';
@@ -254,15 +256,16 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
         dateModified={post.updatedAt.toISOString()}
         image={post.coverImage || undefined}
         tags={post.tags.map(t => t.name)}
+        category={post.category?.name}
       />
       <ReadingProgress />
-      <div className="max-w-[1400px] mx-auto px-4 py-6 md:py-8">
-        <div className="grid grid-cols-1 md:grid-cols-[240px_minmax(0,1fr)] lg:grid-cols-[240px_minmax(0,1fr)_300px] gap-4 lg:gap-6">
+      <div className="max-w-[1400px] mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8">
+        <div className="grid grid-cols-1 md:grid-cols-[240px_minmax(0,1fr)] lg:grid-cols-[240px_minmax(0,1fr)_300px] gap-3 md:gap-4 lg:gap-6">
         
         {/* 左侧边栏 - 目录 */}
         <aside className="-order-1 hidden md:block">
           <div className="flex flex-col gap-4 w-full sticky top-16">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-5">
               <h3 className="text-xs font-bold uppercase tracking-wider bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">On this page</h3>
               <TableOfContents headings={headings} />
             </div>
@@ -271,12 +274,13 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
 
         {/* 中间内容 */}
         <article className="max-w-none">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-purple-600 mb-6 transition-colors font-medium"
-          >
-            ← 返回首页
-          </Link>
+          <Breadcrumb
+            items={[
+              { label: '首页', href: '/' },
+              ...(post.category ? [{ label: post.category.name, href: `/?categoryId=${post.category.id}` }] as BreadcrumbItem[] : []),
+              { label: post.title, href: `/posts/${post.slug || post.id}` },
+            ]}
+          />
 
            <header className="mb-8">
               <div className="flex flex-row items-center gap-3 mb-4 flex-wrap">
@@ -337,8 +341,8 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
 	            </div>
 	          )}
 
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8">
-            <div className="prose prose-gray max-w-none">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-6 md:p-8">
+            <div className="prose prose-gray dark:prose-invert max-w-none">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 rehypePlugins={[rehypeSlug]}
@@ -356,7 +360,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
           {/* 相关文章推荐 */}
           {relatedPosts.length > 0 && (
             <div className="mt-12">
-              <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
                 <span className="text-purple-600">✨</span> 相关文章
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -366,7 +370,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
                     href={`/posts/${related.slug || related.id}`}
                     className="group block"
                   >
-                    <div className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm hover:shadow-md hover:border-purple-200 transition-all duration-300">
+                    <div className="bg-white dark:bg-slate-800 rounded-xl p-5 border border-gray-100 dark:border-slate-700 shadow-sm hover:shadow-md hover:border-purple-200 dark:hover:border-purple-700 transition-all duration-300">
                       {related.category && (
                         <span
                           className="inline-flex px-2.5 py-1 rounded-full text-xs font-medium text-white mb-3"
@@ -375,11 +379,11 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
                           {related.category.name}
                         </span>
                       )}
-                      <h3 className="font-bold text-gray-900 group-hover:text-purple-600 transition-colors mb-2 line-clamp-2">
+                      <h3 className="font-bold text-gray-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors mb-2 line-clamp-2">
                         {related.title}
                       </h3>
                       {related.excerpt && (
-                        <p className="text-sm text-gray-500 line-clamp-2">{related.excerpt}</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2">{related.excerpt}</p>
                       )}
                       <p className="text-xs text-gray-400 mt-3">
                         {new Date(related.createdAt).toLocaleDateString('zh-CN')}
@@ -399,8 +403,8 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
           <div className="flex flex-col gap-4 w-full sticky top-16">
             {/* 作者卡片 */}
             <div className="relative rounded-2xl p-[1px] bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 shadow-lg shadow-purple-500/10">
-              <div className="bg-white rounded-[15px] p-5 h-full">
-                <div className="px-0 pt-0 pb-2 border-b border-gray-50 mb-3">
+              <div className="bg-white dark:bg-slate-800 rounded-[15px] p-5 h-full">
+                <div className="px-0 pt-0 pb-2 border-b border-gray-50 dark:border-slate-700 mb-3">
                   <h3 className="text-xs font-bold uppercase tracking-wider bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Author</h3>
                 </div>
                 <div className="flex items-center gap-3">
@@ -408,26 +412,19 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
                     {siteConfig.author.avatarEmoji}
                   </div>
                   <div>
-                    <p className="font-bold text-gray-900">{siteConfig.author.name}</p>
-                    <p className="text-xs text-gray-500">{siteConfig.author.bio}</p>
+                    <p className="font-bold text-gray-900 dark:text-white">{siteConfig.author.name}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{siteConfig.author.bio}</p>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* 分享卡片 */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-              <div className="px-0 pt-0 pb-2 border-b border-gray-50 mb-3">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-5">
+              <div className="px-0 pt-0 pb-2 border-b border-gray-50 dark:border-slate-700 mb-3">
                 <h3 className="text-xs font-bold uppercase tracking-wider bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">Share</h3>
               </div>
-              <div className="flex gap-2">
-                <button className="flex-1 h-9 rounded-xl bg-gradient-to-r from-blue-400 to-blue-600 text-white text-xs font-bold shadow-md hover:shadow-lg transition-all">
-                  Twitter
-                </button>
-                <button className="flex-1 h-9 rounded-xl bg-gradient-to-r from-blue-600 to-blue-800 text-white text-xs font-bold shadow-md hover:shadow-lg transition-all">
-                  Facebook
-                </button>
-              </div>
+              <ShareButtons title={post.title} url={`/posts/${post.slug || post.id}`} />
             </div>
           </div>
          </aside>

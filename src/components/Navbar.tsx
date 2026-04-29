@@ -22,7 +22,9 @@ export default function Navbar() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   // 键盘快捷键 Ctrl/Cmd + K 打开搜索
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -32,6 +34,7 @@ export default function Navbar() {
     }
     if (e.key === 'Escape') {
       setIsSearchOpen(false);
+      setIsMenuOpen(false);
     }
   }, []);
 
@@ -72,8 +75,78 @@ export default function Navbar() {
     }
   }, [isSearchOpen]);
 
+  // 点击外部关闭菜单
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+    if (isMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.body.style.overflow = '';
+    };
+  }, [isMenuOpen]);
+
   return (
     <>
+      {/* 移动端菜单遮罩 */}
+      {isMenuOpen && (
+        <div className="fixed inset-0 z-[9998] lg:hidden">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsMenuOpen(false)} />
+          <div
+            ref={menuRef}
+            className="absolute right-0 top-0 bottom-0 w-72 bg-white dark:bg-slate-900 shadow-2xl border-l border-gray-100 dark:border-slate-800"
+            style={{ transform: isMenuOpen ? 'translateX(0)' : 'translateX(100%)', transition: 'transform 0.3s ease' }}
+          >
+            {/* 菜单头部 */}
+            <div className="p-4 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between">
+              <span className="font-bold text-lg bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+                菜单
+              </span>
+              <button
+                onClick={() => setIsMenuOpen(false)}
+                className="w-10 h-10 rounded-xl flex items-center justify-center text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* 导航链接 */}
+            <nav className="p-4 flex flex-col gap-2">
+              {siteConfig.nav.map(link => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setIsMenuOpen(false)}
+                  className={`inline-flex items-center h-12 px-4 rounded-xl text-sm font-bold transition-all duration-300 ${
+                    pathname === link.href
+                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg shadow-purple-500/25'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 dark:hover:from-slate-800 dark:hover:to-slate-700 hover:text-purple-600 dark:hover:text-purple-300'
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </nav>
+
+            {/* 菜单底部 */}
+            <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-100 dark:border-slate-800">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500">主题</span>
+                <ThemeToggle />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 搜索弹窗 */}
       {isSearchOpen && (
         <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-24 px-4">
@@ -232,20 +305,30 @@ export default function Navbar() {
               </div>
             </div>
 
-            {/* Mobile 搜索按钮 */}
-            <button 
-              onClick={() => setIsSearchOpen(true)}
-              className="inline-flex h-10 cursor-pointer items-center justify-center rounded-xl bg-gray-100 px-4 py-2 text-sm font-bold text-gray-600 transition-all duration-300 hover:bg-gradient-to-r hover:from-blue-500 hover:to-purple-600 hover:text-white dark:bg-slate-800 dark:text-gray-300 dark:hover:text-white lg:hidden"
-            >
-               <svg 
-                 className="h-4 w-4 fill-current" 
-                 viewBox="0 0 15 15" 
-                 width="15" 
-                 height="15" 
-               >
-                 <path d="M10 6.5C10 8.433 8.433 10 6.5 10C4.567 10 3 8.433 3 6.5C3 4.567 4.567 3 6.5 3C8.433 3 10 4.567 10 6.5ZM9.30884 10.0159C8.53901 10.6318 7.56251 11 6.5 11C4.01472 11 2 8.98528 2 6.5C2 4.01472 4.01472 2 6.5 2C8.98528 2 11 4.01472 11 6.5C11 7.56251 10.6318 8.53901 10.0159 9.30884L12.8536 12.1464C13.0488 12.3417 13.0488 12.6583 12.8536 12.8536C12.6583 13.0488 12.3417 13.0488 12.1464 12.8536L9.30884 10.0159Z" />
-               </svg>
-            </button>
+            {/* Mobile 搜索和菜单按钮 */}
+            <div className="flex items-center gap-2 lg:hidden">
+              <button
+                onClick={() => setIsSearchOpen(true)}
+                className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl bg-gray-100 text-gray-600 transition-all duration-300 hover:bg-gradient-to-r hover:from-blue-500 hover:to-purple-600 hover:text-white dark:bg-slate-800 dark:text-gray-300 dark:hover:text-white"
+              >
+                 <svg
+                   className="h-4 w-4 fill-current"
+                   viewBox="0 0 15 15"
+                   width="15"
+                   height="15"
+                 >
+                   <path d="M10 6.5C10 8.433 8.433 10 6.5 10C4.567 10 3 8.433 3 6.5C3 4.567 4.567 3 6.5 3C8.433 3 10 4.567 10 6.5ZM9.30884 10.0159C8.53901 10.6318 7.56251 11 6.5 11C4.01472 11 2 8.98528 2 6.5C2 4.01472 4.01472 2 6.5 2C8.98528 2 11 4.01472 11 6.5C11 7.56251 10.6318 8.53901 10.0159 9.30884L12.8536 12.1464C13.0488 12.3417 13.0488 12.6583 12.8536 12.8536C12.6583 13.0488 12.3417 13.0488 12.1464 12.8536L9.30884 10.0159Z" />
+                 </svg>
+              </button>
+              <button
+                onClick={() => setIsMenuOpen(true)}
+                className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl bg-gray-100 text-gray-600 transition-all duration-300 hover:bg-gradient-to-r hover:from-blue-500 hover:to-purple-600 hover:text-white dark:bg-slate-800 dark:text-gray-300 dark:hover:text-white"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </header>
