@@ -1,10 +1,23 @@
 import Link from 'next/link';
+import type { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { requireAuth } from '@/lib/auth';
 import CommentActionButton from '@/components/CommentActionButton';
 import AdminSidebar from '@/components/AdminSidebar';
 
 export const dynamic = 'force-dynamic';
+
+type AdminComment = Prisma.CommentGetPayload<{
+  include: {
+    post: {
+      select: {
+        id: true;
+        slug: true;
+        title: true;
+      };
+    };
+  };
+}>;
 
 export default async function AdminComments() {
   if (!(await requireAuth())) {
@@ -25,7 +38,7 @@ export default async function AdminComments() {
   }
 
   // 获取所有评论
-  const comments = await prisma.comment.findMany({
+  const comments: AdminComment[] = await prisma.comment.findMany({
     include: {
       post: {
         select: {
