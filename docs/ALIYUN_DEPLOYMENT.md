@@ -232,3 +232,4 @@ password: ADMIN_PASSWORD from .env
 ```
 
 In production, `ADMIN_PASSWORD` or `ADMIN_PASSWORD_HASH` is required at runtime. The development fallback is only for local non-production use.
+New stored user password hashes use bcrypt. Legacy SHA256 hashes remain compatible and are upgraded after successful named-user login.

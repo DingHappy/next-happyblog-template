@@ -66,10 +66,11 @@ For production admin access, set one of these in the private production environm
 ```env
 ADMIN_PASSWORD=your_strong_password
 # or
-ADMIN_PASSWORD_HASH=sha256_hash_of_your_password
+ADMIN_PASSWORD_HASH=bcrypt_hash_of_your_password
 ```
 
 The first `superadmin` user is created on first successful admin login with username `admin`.
+New password hashes use bcrypt. Legacy SHA256 hashes are still accepted and are upgraded automatically when a named user logs in successfully.
 
 Resolve conflicts only in private customization files. Keep production-only content isolated so future merges stay small.
 

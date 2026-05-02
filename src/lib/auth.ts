@@ -1,9 +1,11 @@
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import prisma from '@/lib/prisma';
 
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+const BCRYPT_ROUNDS = 12;
 const DEFAULT_PASSWORD_HASH =
   '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9'; // sha256("admin123")
 
@@ -28,13 +30,25 @@ export function hasPermission(userRole: UserRole, requiredRole: UserRole): boole
   return ROLES[userRole]?.includes(requiredRole) ?? false;
 }
 
+function sha256(password: string): string {
+  return crypto.createHash('sha256').update(password).digest('hex');
+}
+
+function isBcryptHash(hash: string): boolean {
+  return /^\$2[aby]\$\d{2}\$/.test(hash);
+}
+
+function isSha256Hash(hash: string): boolean {
+  return /^[a-f0-9]{64}$/i.test(hash);
+}
+
 function resolvePasswordHash(): string {
   const envHash = process.env.ADMIN_PASSWORD_HASH;
   if (envHash) return envHash.trim();
 
   const envPassword = process.env.ADMIN_PASSWORD;
   if (envPassword) {
-    return crypto.createHash('sha256').update(envPassword).digest('hex');
+    return hashPassword(envPassword);
   }
 
   if (process.env.NODE_ENV === 'production') {
@@ -152,13 +166,26 @@ export async function destroySession(sessionId: string): Promise<void> {
   await prisma.session.delete({ where: { id: sessionId } }).catch(() => {});
 }
 
-export function verifyPassword(password: string): boolean {
-  const hash = crypto.createHash('sha256').update(password).digest('hex');
-  return hash === resolvePasswordHash();
+export function verifyPasswordAgainstHash(password: string, storedHash: string): boolean {
+  if (isBcryptHash(storedHash)) {
+    return bcrypt.compareSync(password, storedHash);
+  }
+  if (isSha256Hash(storedHash)) {
+    return sha256(password) === storedHash.toLowerCase();
+  }
+  return false;
+}
+
+export function shouldUpgradePasswordHash(storedHash: string): boolean {
+  return !isBcryptHash(storedHash);
+}
+
+export async function verifyPassword(password: string): Promise<boolean> {
+  return verifyPasswordAgainstHash(password, resolvePasswordHash());
 }
 
 export function hashPassword(password: string): string {
-  return crypto.createHash('sha256').update(password).digest('hex');
+  return bcrypt.hashSync(password, BCRYPT_ROUNDS);
 }
 
 export async function ensureDefaultUser(): Promise<void> {

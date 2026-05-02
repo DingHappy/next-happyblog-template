@@ -1,5 +1,13 @@
 import { NextResponse } from 'next/server';
-import { createSession, createLegacySession, verifyPassword, hashPassword, ensureDefaultUser } from '@/lib/auth';
+import {
+  createSession,
+  createLegacySession,
+  verifyPassword,
+  verifyPasswordAgainstHash,
+  hashPassword,
+  shouldUpgradePasswordHash,
+  ensureDefaultUser,
+} from '@/lib/auth';
 import prisma from '@/lib/prisma';
 
 export async function POST(request: Request) {
@@ -22,16 +30,23 @@ export async function POST(request: Request) {
         where: { username },
       });
 
-      if (!user || user.password !== hashPassword(password)) {
+      if (!user || !verifyPasswordAgainstHash(password, user.password)) {
         return NextResponse.json(
           { error: '用户名或密码错误' },
           { status: 401 }
         );
       }
 
+      if (shouldUpgradePasswordHash(user.password)) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { password: hashPassword(password) },
+        });
+      }
+
       userId = user.id;
     } else {
-      if (!verifyPassword(password)) {
+      if (!await verifyPassword(password)) {
         return NextResponse.json(
           { error: '密码错误' },
           { status: 401 }
