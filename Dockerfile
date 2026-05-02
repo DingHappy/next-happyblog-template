@@ -17,8 +17,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Next.js 生产构建
-RUN npm run build
+# 生成 Prisma Client，并执行 Next.js 生产构建
+RUN npx prisma generate && npm run build
 
 # 生产运行阶段
 FROM base AS runner
