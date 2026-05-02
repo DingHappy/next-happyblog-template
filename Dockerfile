@@ -1,5 +1,8 @@
 FROM node:20-alpine AS base
 
+# Prisma engines require OpenSSL inside Alpine-based images.
+RUN apk add --no-cache openssl
+
 # 安装依赖阶段
 FROM base AS deps
 WORKDIR /app
