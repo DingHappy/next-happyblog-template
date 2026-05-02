@@ -7,6 +7,9 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   let dbStatus = 'ok';
   let dbResponseTime = 0;
+  let migrationStatus = 'unknown';
+  let migrationCount = 0;
+  let latestMigration: string | null = null;
 
   try {
     const dbStart = Date.now();
@@ -14,6 +17,22 @@ export async function GET() {
     dbResponseTime = Date.now() - dbStart;
   } catch {
     dbStatus = 'error';
+    migrationStatus = 'error';
+  }
+
+  if (dbStatus === 'ok') {
+    try {
+      const migrations = await prisma.$queryRaw<Array<{ migration_name: string; finished_at: Date | null }>>`
+        SELECT migration_name, finished_at
+        FROM _prisma_migrations
+        ORDER BY finished_at DESC NULLS LAST, started_at DESC
+      `;
+      migrationCount = migrations.length;
+      latestMigration = migrations[0]?.migration_name ?? null;
+      migrationStatus = migrations.some((migration) => !migration.finished_at) ? 'pending' : 'ok';
+    } catch {
+      migrationStatus = 'unavailable';
+    }
   }
 
   const uptime = process.uptime();
@@ -24,6 +43,15 @@ export async function GET() {
   const healthData = {
     status: dbStatus === 'ok' ? 'healthy' : 'degraded',
     timestamp: new Date().toISOString(),
+    service: {
+      name: process.env.APP_NAME || 'next-happyblog-template',
+      environment: process.env.NODE_ENV || 'development',
+      version: process.env.APP_VERSION || process.env.npm_package_version || '0.1.0',
+      commit: process.env.BUILD_SHA || process.env.VERCEL_GIT_COMMIT_SHA || 'unknown',
+      node: process.version,
+      platform: process.platform,
+      arch: process.arch,
+    },
     uptime: {
       seconds: Math.floor(uptime),
       formatted: formatUptime(uptime),
@@ -31,6 +59,11 @@ export async function GET() {
     database: {
       status: dbStatus,
       responseTimeMs: dbResponseTime,
+      migrations: {
+        status: migrationStatus,
+        count: migrationCount,
+        latest: latestMigration,
+      },
     },
     memory: {
       heapUsed: Math.round(memoryUsage.heapUsed / 1024 / 1024),

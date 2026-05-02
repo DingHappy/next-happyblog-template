@@ -4,10 +4,13 @@ import { requireAuth, unauthorizedResponse } from '@/lib/auth';
 import fs from 'fs/promises';
 import path from 'path';
 
-const KNOWLEDGE_BASE_PATH =
-  process.env.EXPORT_KNOWLEDGE_PATH ||
-  process.env.KNOWLEDGE_BASE_PATH ||
-  path.join(/*turbopackIgnore: true*/ process.cwd(), 'knowledge', 'docs');
+function getKnowledgeBasePath(): string {
+  return (
+    process.env.EXPORT_KNOWLEDGE_PATH ||
+    process.env.KNOWLEDGE_BASE_PATH ||
+    path.join(process.cwd(), 'knowledge', 'docs')
+  );
+}
 
 // 确保目录存在
 async function ensureDir(dir: string) {
@@ -47,7 +50,7 @@ export async function GET() {
       posts.map(async (post) => {
         const categorySlug = post.category?.name || 'uncategorized';
         const fileName = slugify(post.title) + '.md';
-        const filePath = path.join(KNOWLEDGE_BASE_PATH, categorySlug, fileName);
+        const filePath = path.join(getKnowledgeBasePath(), categorySlug, fileName);
 
         try {
           await fs.access(filePath);
@@ -99,7 +102,7 @@ export async function POST(request: Request) {
     for (const post of posts) {
       const categorySlug = post.category?.name || 'uncategorized';
       const fileName = slugify(post.title) + '.md';
-      const dirPath = path.join(KNOWLEDGE_BASE_PATH, categorySlug);
+      const dirPath = path.join(getKnowledgeBasePath(), categorySlug);
       const filePath = path.join(dirPath, fileName);
 
       try {

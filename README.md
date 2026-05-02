@@ -57,7 +57,10 @@ Database backup helpers:
 ```bash
 ./scripts/backup-db.sh
 ./scripts/restore-db.sh backups/blog_db_YYYYMMDD_HHMMSS.dump
+./scripts/install-backup-cron.sh
 ```
+
+See [docs/BACKUP.md](docs/BACKUP.md).
 
 ## Safety
 

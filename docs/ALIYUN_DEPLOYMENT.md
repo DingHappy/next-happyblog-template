@@ -176,6 +176,14 @@ docker compose -f docker-compose.aliyun.yml up -d app
 
 Use `--no-cache` only when changing base image dependencies or debugging stale Docker layers.
 
+The Dockerfile keeps dependency installation and Prisma Client generation in a stable cache layer. Normal source-only updates should use `build` without `--no-cache`.
+
+Optionally pass version metadata into the image:
+
+```bash
+APP_VERSION=1.0.0 BUILD_SHA="$(git rev-parse --short HEAD)" docker compose -f docker-compose.aliyun.yml build
+```
+
 ## Backups
 
 Create a database backup:
@@ -196,4 +204,31 @@ Schedule daily backups:
 0 2 * * * cd /opt/my-blog-production && ./scripts/backup-db.sh >> backups/backup.log 2>&1
 ```
 
+Or install the cron entry from the project root:
+
+```bash
+./scripts/install-backup-cron.sh
+```
+
 Do not run `docker compose down -v` or `docker system prune --volumes` unless you intentionally want to remove database volumes.
+
+## Health Check
+
+The application exposes:
+
+```bash
+curl http://127.0.0.1:3000/api/health
+```
+
+The response includes database status, Prisma migration status, process memory, uptime, app version, build commit, Node.js version, and platform information.
+
+## First Admin User
+
+On first successful admin login, the app ensures a `superadmin` user exists:
+
+```text
+username: admin
+password: ADMIN_PASSWORD from .env
+```
+
+In production, `ADMIN_PASSWORD` or `ADMIN_PASSWORD_HASH` is required at runtime. The development fallback is only for local non-production use.

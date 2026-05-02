@@ -61,6 +61,16 @@ npx prisma migrate deploy
 npm run build
 ```
 
+For production admin access, set one of these in the private production environment:
+
+```env
+ADMIN_PASSWORD=your_strong_password
+# or
+ADMIN_PASSWORD_HASH=sha256_hash_of_your_password
+```
+
+The first `superadmin` user is created on first successful admin login with username `admin`.
+
 Resolve conflicts only in private customization files. Keep production-only content isolated so future merges stay small.
 
 For Docker-based production, use the compose file that matches the host:

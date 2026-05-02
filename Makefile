@@ -55,6 +55,9 @@ aliyun-migrate: ## 运行阿里云部署数据库迁移
 aliyun-logs: ## 查看阿里云部署应用日志
 	docker compose -f docker-compose.aliyun.yml logs -f app
 
+install-backup-cron: ## 安装每日数据库备份 cron
+	./scripts/install-backup-cron.sh
+
 up: ## 启动服务（后台运行）
 	@echo '${YELLOW}正在启动服务...${RESET}'
 	docker-compose up -d

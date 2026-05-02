@@ -1,5 +1,7 @@
 FROM node:20-alpine AS base
 
+ENV NEXT_TELEMETRY_DISABLED=1
+
 # Prisma engines require OpenSSL inside Alpine-based images.
 RUN apk add --no-cache openssl
 
@@ -7,12 +9,14 @@ RUN apk add --no-cache openssl
 FROM base AS deps
 WORKDIR /app
 
-# 复制 package 文件
+# 复制依赖清单和 Prisma schema，尽量稳定 Docker 缓存层
 COPY package.json package-lock.json* ./
+COPY prisma ./prisma
 
-# 安装依赖（使用国内镜像加速）
+# 安装依赖并生成 Prisma Client（使用国内镜像加速）
 RUN npm config set registry https://registry.npmmirror.com && \
-    npm ci --no-audit --no-fund
+    npm ci --no-audit --no-fund && \
+    npx prisma generate
 
 # 构建阶段
 FROM base AS builder
@@ -20,15 +24,21 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# 生成 Prisma Client，并执行 Next.js 生产构建
-RUN npx prisma generate && npm run build
+# Next.js 生产构建
+RUN npm run build
 
 # 生产运行阶段
 FROM base AS runner
 WORKDIR /app
 
+ARG APP_VERSION=0.1.0
+ARG BUILD_SHA=unknown
+
 ENV NODE_ENV=production
 ENV TZ=Asia/Shanghai
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV APP_VERSION=$APP_VERSION
+ENV BUILD_SHA=$BUILD_SHA
 
 # 创建非 root 用户
 RUN addgroup --system --gid 1001 nodejs && \

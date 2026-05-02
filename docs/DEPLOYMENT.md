@@ -215,13 +215,24 @@ curl http://localhost:3000/api/health
 {
   "status": "healthy",
   "timestamp": "2024-01-01T12:00:00.000Z",
+  "service": {
+    "name": "next-happyblog-template",
+    "environment": "production",
+    "version": "0.1.0",
+    "commit": "unknown"
+  },
   "uptime": {
     "seconds": 86400,
     "formatted": "1d 0h 0m 0s"
   },
   "database": {
     "status": "ok",
-    "responseTimeMs": 1.2
+    "responseTimeMs": 1.2,
+    "migrations": {
+      "status": "ok",
+      "count": 9,
+      "latest": "20260429100000_add_analytics_sessions"
+    }
   },
   "memory": { ... }
 }

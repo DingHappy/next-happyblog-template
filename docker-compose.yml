@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -27,6 +25,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        APP_VERSION: ${APP_VERSION:-0.1.0}
+        BUILD_SHA: ${BUILD_SHA:-unknown}
     container_name: blog-app
     restart: unless-stopped
     environment:

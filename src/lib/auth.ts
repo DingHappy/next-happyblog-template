@@ -43,8 +43,6 @@ function resolvePasswordHash(): string {
   return DEFAULT_PASSWORD_HASH;
 }
 
-const PASSWORD_HASH = resolvePasswordHash();
-
 export async function createLegacySession(): Promise<string> {
   const sessionId = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
@@ -156,7 +154,7 @@ export async function destroySession(sessionId: string): Promise<void> {
 
 export function verifyPassword(password: string): boolean {
   const hash = crypto.createHash('sha256').update(password).digest('hex');
-  return hash === PASSWORD_HASH;
+  return hash === resolvePasswordHash();
 }
 
 export function hashPassword(password: string): string {
@@ -164,6 +162,7 @@ export function hashPassword(password: string): string {
 }
 
 export async function ensureDefaultUser(): Promise<void> {
+  const passwordHash = resolvePasswordHash();
   const existing = await prisma.user.findFirst({
     where: { role: 'superadmin' },
   });
@@ -172,11 +171,15 @@ export async function ensureDefaultUser(): Promise<void> {
     await prisma.user.create({
       data: {
         username: 'admin',
-        password: PASSWORD_HASH,
+        password: passwordHash,
         role: 'superadmin',
         displayName: '管理员',
       },
     });
-    console.log('[auth] 创建默认开发管理员账号: admin / admin123');
+    const credentialHint =
+      process.env.NODE_ENV === 'production'
+        ? 'admin / ADMIN_PASSWORD'
+        : 'admin / admin123';
+    console.log(`[auth] 创建默认管理员账号: ${credentialHint}`);
   }
 }
