@@ -9,7 +9,10 @@ interface LazyImageProps {
   width?: number;
   height?: number;
   className?: string;
+  imageClassName?: string;
   fill?: boolean;
+  priority?: boolean;
+  sizes?: string;
 }
 
 export default function LazyImage({
@@ -18,10 +21,13 @@ export default function LazyImage({
   width,
   height,
   className = '',
+  imageClassName = '',
   fill = false,
+  priority = false,
+  sizes = '(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw',
 }: LazyImageProps) {
   const [isLoaded, setIsLoaded] = useState(false);
-  const [isInView, setIsInView] = useState(false);
+  const [isInView, setIsInView] = useState(priority);
   const imgRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -59,10 +65,11 @@ export default function LazyImage({
           fill={fill}
           className={`transition-opacity duration-500 ${
             isLoaded ? 'opacity-100' : 'opacity-0'
-          } ${fill ? 'object-cover' : ''}`}
+          } ${fill ? 'object-cover' : ''} ${imageClassName}`}
           onLoad={() => setIsLoaded(true)}
-          loading="lazy"
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+          loading={priority ? 'eager' : 'lazy'}
+          priority={priority}
+          sizes={sizes}
         />
       )}
     </div>

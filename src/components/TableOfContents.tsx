@@ -7,6 +7,17 @@ export default function TableOfContents({ headings }: { headings: Heading[] }) {
   const [activeId, setActiveId] = useState<string | null>(headings[0]?.id ?? null);
 
   useEffect(() => {
+    const initialHash = decodeURIComponent(window.location.hash.replace(/^#/, ''));
+    if (initialHash && headings.some((heading) => heading.id === initialHash)) {
+      const frame = requestAnimationFrame(() => {
+        setActiveId(initialHash);
+        document.getElementById(initialHash)?.scrollIntoView({ block: 'start' });
+      });
+      return () => cancelAnimationFrame(frame);
+    }
+  }, [headings]);
+
+  useEffect(() => {
     if (headings.length === 0) return;
 
     const observer = new IntersectionObserver(
@@ -37,6 +48,7 @@ export default function TableOfContents({ headings }: { headings: Heading[] }) {
     e.preventDefault();
     const element = document.getElementById(id);
     if (element) {
+      setActiveId(id);
       element.scrollIntoView({ behavior: 'smooth', block: 'start' });
       window.history.pushState(null, '', `#${id}`);
     }

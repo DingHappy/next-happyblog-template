@@ -3,34 +3,10 @@ import type { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { requireAuth, unauthorizedResponse } from '@/lib/auth';
 import { withAuditLog } from '@/lib/audit';
-import { slugify } from '@/lib/slug';
-
-function normalizeTagNames(value: unknown): string[] {
-  const rawTags = Array.isArray(value)
-    ? value
-    : typeof value === 'string'
-      ? value.split(',')
-      : [];
-
-  const tagsBySlug = new Map<string, string>();
-  for (const rawTag of rawTags) {
-    const name = String(rawTag).trim();
-    if (!name) continue;
-    const slug = slugifyTag(name);
-    if (!tagsBySlug.has(slug)) {
-      tagsBySlug.set(slug, name);
-    }
-  }
-
-  return Array.from(tagsBySlug.values());
-}
-
-function slugifyTag(name: string): string {
-  return slugify(name) || name;
-}
+import { normalizePostSlug, normalizeTagNames, slugifyTag, validatePostInput } from '@/lib/post-content';
 
 async function buildUniquePostSlug(title: string, requestedSlug?: string) {
-  const base = slugify(requestedSlug || title) || `post-${Date.now()}`;
+  const base = normalizePostSlug(title, requestedSlug);
   let slug = base;
   let counter = 1;
 
@@ -75,17 +51,25 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const tagNames = normalizeTagNames(body.tags);
-    const slug = await buildUniquePostSlug(body.title, body.slug);
+    const validation = validatePostInput(body);
+    if (validation.errors.length > 0) {
+      return NextResponse.json(
+        { error: validation.errors[0], errors: validation.errors, warnings: validation.warnings },
+        { status: 400 }
+      );
+    }
+
+    const { title, excerpt, content, tags: tagNames } = validation.normalized;
+    const slug = await buildUniquePostSlug(title, validation.normalized.slug);
 
     const post = await withAuditLog(
       { action: 'create', resource: 'post' },
       () => prisma.post.create({
         data: {
-          title: body.title,
+          title,
           slug,
-          excerpt: body.excerpt,
-          content: body.content,
+          excerpt,
+          content,
           categoryId: body.categoryId || null,
           coverImage: body.coverImage || null,
           published: body.published ?? true,

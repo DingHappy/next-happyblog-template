@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma';
 import { requireAuth } from '@/lib/auth';
 import { siteConfig } from '@/config/site';
 import { WebSiteJsonLd, OrganizationJsonLd } from '@/components/JsonLd';
+import LazyImage from '@/components/LazyImage';
 
 export const dynamic = 'force-dynamic';
 
@@ -323,7 +324,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
         {/* 中间文章列表 */}
         <div className="w-full flex flex-col items-center gap-8">
           <div className="w-full flex flex-col gap-4">
-            {posts.map(post => {
+            {posts.map((post, index) => {
               const postHref = `/posts/${post.slug || post.id}`;
               return (
               <Link 
@@ -333,7 +334,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
               >
                 <div className="relative rounded-2xl overflow-hidden transition-all duration-300 group-hover:-translate-y-1">
                   <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-purple-500/0 to-pink-500/0 group-hover:from-blue-500/5 group-hover:via-purple-500/5 group-hover:to-pink-500/5 transition-all duration-500" />
-                  <div className="relative bg-white rounded-2xl p-6 shadow-sm border border-gray-100 group-hover:shadow-xl group-hover:border-purple-100 transition-all duration-300">
+                  <div className="relative rounded-2xl border border-gray-100 bg-white p-6 shadow-sm transition-all duration-300 group-hover:border-purple-100 group-hover:shadow-xl dark:border-slate-800 dark:bg-slate-900 dark:group-hover:border-purple-800">
                      <div className="flex flex-row items-center gap-3 mb-3 flex-wrap">
                       {post.category && (
                         <span 
@@ -365,13 +366,24 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
                         </>
                       )}
                     </div>
-                    <h3 className="text-xl md:text-2xl font-bold mb-3 leading-snug group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-purple-600 group-hover:bg-clip-text transition-all duration-300 text-gray-900">
+                    {post.coverImage && (
+                      <LazyImage
+                        src={post.coverImage}
+                        alt={post.title}
+                        fill
+                        priority={index === 0}
+                        className="mb-5 aspect-[16/7] rounded-xl border border-gray-100 bg-gray-50 dark:border-slate-800 dark:bg-slate-800"
+                        imageClassName="transition-transform duration-700 group-hover:scale-[1.03]"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 70vw, 760px"
+                      />
+                    )}
+                    <h3 className="text-xl md:text-2xl font-bold mb-3 leading-snug group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-purple-600 group-hover:bg-clip-text transition-all duration-300 text-gray-900 dark:text-white">
                       {post.title}
                     </h3>
-                    <p className="text-gray-600 leading-relaxed mb-4">
+                    <p className="text-gray-600 dark:text-gray-300 leading-relaxed mb-4 line-clamp-3">
                       {post.excerpt}
                     </p>
-                     <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-50">
+                     <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-50 dark:border-slate-800">
                        <div className="flex gap-2">
                          {post.category && (
                            <span 

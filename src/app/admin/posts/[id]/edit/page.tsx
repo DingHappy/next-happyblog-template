@@ -8,8 +8,10 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import MarkdownEditor from '@/components/MarkdownEditor';
 import MediaPicker from '@/components/MediaPicker';
+import PostQualityPanel from '@/components/PostQualityPanel';
 import { useToast } from '@/components/FeedbackProvider';
 import { slugify } from '@/lib/slug';
+import { normalizeTagNames } from '@/lib/post-content';
 
 interface Category {
   id: string;
@@ -151,7 +153,8 @@ export default function EditPost({ params }: { params: Promise<{ id: string }> }
         toast('文章已保存', 'success');
         router.push('/admin/posts');
       } else {
-        toast('保存失败，请重试', 'error');
+        const error = await response.json().catch(() => null);
+        toast(error?.error || '保存失败，请重试', 'error');
       }
     } catch {
       toast('保存失败，请重试', 'error');
@@ -337,10 +340,11 @@ export default function EditPost({ params }: { params: Promise<{ id: string }> }
                       type="text"
                       value={formData.tags}
                       onChange={(e) => setFormData(prev => ({ ...prev, tags: e.target.value }))}
+                      onBlur={() => setFormData(prev => ({ ...prev, tags: normalizeTagNames(prev.tags).join(', ') }))}
                       placeholder="React, Next.js, 生活"
                       className="w-full px-4 py-2.5 bg-gray-50 rounded-xl border-2 border-transparent focus:border-purple-300 focus:bg-white outline-none transition-all text-sm"
                     />
-                    <p className="mt-1.5 text-xs text-gray-400">多个标签用英文逗号分隔</p>
+                    <p className="mt-1.5 text-xs text-gray-400">多个标签用英文逗号分隔，重复标签会自动合并</p>
                   </div>
 
                   <div>
@@ -417,6 +421,17 @@ export default function EditPost({ params }: { params: Promise<{ id: string }> }
                     )}
                  </div>
                </div>
+
+               <PostQualityPanel
+                 title={formData.title}
+                 slug={formData.slug}
+                 excerpt={formData.excerpt}
+                 content={formData.content}
+                 tags={formData.tags}
+                 onApplySlug={(slug) => setFormData(prev => ({ ...prev, slug }))}
+                 onApplyExcerpt={(excerpt) => setFormData(prev => ({ ...prev, excerpt }))}
+                 onNormalizeTags={(tags) => setFormData(prev => ({ ...prev, tags }))}
+               />
              </div>
           </div>
         ) : (
@@ -439,7 +454,7 @@ export default function EditPost({ params }: { params: Promise<{ id: string }> }
               })()}
               {formData.tags && (
                 <div className="flex flex-wrap gap-2 mb-4">
-                  {formData.tags.split(',').map(tag => tag.trim()).filter(Boolean).map(tag => (
+                  {normalizeTagNames(formData.tags).map(tag => (
                     <span key={tag} className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
                       #{tag}
                     </span>
