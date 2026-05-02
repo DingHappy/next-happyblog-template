@@ -36,6 +36,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql://blog:blogpassword@postgres:5432/blog_db?schema=public}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH}
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       NEXT_PUBLIC_URL: ${NEXT_PUBLIC_URL:-http://localhost:3000}
       SMTP_HOST: ${SMTP_HOST}
@@ -78,6 +79,33 @@ services:
       - blog-network
     profiles:
       - full
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+      args:
+        APP_VERSION: ${APP_VERSION:-0.1.0}
+        BUILD_SHA: ${BUILD_SHA:-unknown}
+    container_name: blog-migrate
+    profiles:
+      - tools
+    environment:
+      NODE_ENV: production
+      TZ: Asia/Shanghai
+      DATABASE_URL: ${DATABASE_URL:-postgresql://blog:blogpassword@postgres:5432/blog_db?schema=public}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_DISPLAY_NAME: ${ADMIN_DISPLAY_NAME:-管理员}
+    command: ["npx", "prisma", "migrate", "deploy"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - blog-network
 
 networks:
   blog-network:

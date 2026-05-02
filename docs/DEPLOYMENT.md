@@ -40,7 +40,11 @@ vim .env
 make build
 make up
 
-# 5. 查看日志确认启动成功
+# 5. 执行迁移并初始化管理员
+make db-migrate
+docker compose --profile tools run --rm migrate npm run admin:create
+
+# 6. 查看日志确认启动成功
 make logs-app
 ```
 
@@ -57,10 +61,21 @@ make logs-app
 NEXT_PUBLIC_URL=https://your-domain.com
 
 # 管理员密码
+ADMIN_USERNAME=admin
 ADMIN_PASSWORD=your_strong_password
 
 # 数据库连接
 DATABASE_URL=postgresql://blog:your_password@postgres:5432/blog_db?schema=public
+```
+
+本机开发不要使用 `postgres:5432`，应复制 `.env.example` 或 `.env.local.example`，并使用 `localhost:5432`：
+
+```bash
+cp .env.example .env
+npm run db:up
+npm run db:migrate
+npm run admin:create
+npm run dev
 ```
 
 ### 可选配置项

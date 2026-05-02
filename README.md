@@ -21,11 +21,50 @@ It is intended for a public template repository plus a private production reposi
 npm install
 cp .env.example .env
 npm run db:up
-npx prisma migrate dev
+npm run db:migrate
+npm run admin:create
 npm run dev
 ```
 
 Open `http://localhost:3000`.
+
+The default `.env.example` is for host-machine development. It connects Prisma and `npm run dev` to `localhost:5432`, while Docker exposes PostgreSQL from the `postgres` service.
+
+Admin initialization reads these values from `.env`:
+
+```env
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=change_this_local_password
+ADMIN_EMAIL=admin@example.com
+ADMIN_DISPLAY_NAME=管理员
+```
+
+You can also create or reset the admin explicitly:
+
+```bash
+ADMIN_PASSWORD='your_new_password' npm run admin:create
+```
+
+## Environment Files
+
+Use the right example for the runtime:
+
+```bash
+# Local development: Next.js and Prisma run on your host machine.
+cp .env.example .env
+# Equivalent explicit local example:
+cp .env.local.example .env
+
+# Production/server Docker app: app container talks to postgres:5432.
+cp .env.production.example .env
+```
+
+The important difference is the database host:
+
+```text
+Local npm run dev / npx prisma: localhost:5432
+Docker app container: postgres:5432
+```
 
 ## Template Customization
 
@@ -44,9 +83,11 @@ See [docs/TEMPLATE_USAGE.md](docs/TEMPLATE_USAGE.md) for the public-template/pri
 For an Aliyun ECS host where Nginx and Certbot run on the host and Docker runs only the app/PostgreSQL stack, use:
 
 ```bash
+cp .env.production.example .env
 docker compose -f docker-compose.aliyun.yml build
 docker compose -f docker-compose.aliyun.yml up -d postgres
 docker compose -f docker-compose.aliyun.yml --profile tools run --rm migrate
+docker compose -f docker-compose.aliyun.yml --profile tools run --rm migrate npm run admin:create
 docker compose -f docker-compose.aliyun.yml up -d app
 ```
 

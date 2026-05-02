@@ -58,6 +58,7 @@ When template development is ready to ship:
 git fetch template
 git merge template/main
 npx prisma migrate deploy
+npm run admin:create
 npm run build
 ```
 
@@ -69,7 +70,8 @@ ADMIN_PASSWORD=your_strong_password
 ADMIN_PASSWORD_HASH=bcrypt_hash_of_your_password
 ```
 
-The first `superadmin` user is created on first successful admin login with username `admin`.
+Prefer creating or resetting the first `superadmin` user explicitly with `npm run admin:create`.
+The login route can still create the first `superadmin` user on first successful admin login with username `admin`.
 New password hashes use bcrypt. Legacy SHA256 hashes are still accepted and are upgraded automatically when a named user logs in successfully.
 
 Resolve conflicts only in private customization files. Keep production-only content isolated so future merges stay small.

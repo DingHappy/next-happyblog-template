@@ -25,8 +25,8 @@ help: ## 显示帮助信息
 init: ## 初始化部署环境（首次运行）
 	@echo '${YELLOW}正在初始化部署环境...${RESET}'
 	@if [ ! -f .env ]; then \
-		cp .env.example .env; \
-		echo '${GREEN}✓ .env 文件已创建，请修改其中的配置${RESET}'; \
+		cp .env.production.example .env; \
+		echo '${GREEN}✓ .env 文件已从 .env.production.example 创建，请修改其中的生产配置${RESET}'; \
 	fi
 	@mkdir -p public/uploads backups
 	@echo '${GREEN}✓ 目录结构已创建${RESET}'
@@ -35,6 +35,8 @@ init: ## 初始化部署环境（首次运行）
 	@echo '1. 编辑 .env 文件，配置正确的环境变量'
 	@echo '2. 运行 make build 构建镜像'
 	@echo '3. 运行 make up 启动服务'
+	@echo '4. 运行 make db-migrate 执行迁移'
+	@echo '5. 运行 make admin-create 初始化管理员'
 
 build: ## 构建 Docker 镜像
 	@echo '${YELLOW}正在构建 Docker 镜像...${RESET}'
@@ -121,7 +123,11 @@ db-restore: ## 数据库恢复（需指定 BACKUP_FILE=文件名）
 
 db-migrate: ## 运行数据库迁移
 	@echo '${YELLOW}正在运行数据库迁移...${RESET}'
-	docker-compose exec app npx prisma migrate deploy
+	docker compose --profile tools run --rm migrate
+
+admin-create: ## 创建或重置管理员账号
+	@echo '${YELLOW}正在创建或重置管理员账号...${RESET}'
+	docker compose --profile tools run --rm migrate npm run admin:create
 
 # ============================================
 # 管理命令

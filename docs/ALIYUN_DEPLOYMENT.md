@@ -48,7 +48,7 @@ systemctl restart docker
 cd /opt
 git clone https://github.com/your-name/your-production-repo.git my-blog-production
 cd my-blog-production
-cp .env.example .env
+cp .env.production.example .env
 vim .env
 ```
 
@@ -67,6 +67,7 @@ DB_NAME=blog_db
 DATABASE_URL=postgresql://blog:change_to_a_letters_and_numbers_password@postgres:5432/blog_db?schema=public&connect_timeout=30&pool_timeout=30
 
 ADMIN_PASSWORD=change_to_a_strong_admin_password
+ADMIN_USERNAME=admin
 ADMIN_EMAIL=admin@example.com
 NEXTAUTH_SECRET=replace_with_openssl_rand_hex_32
 ```
@@ -85,6 +86,7 @@ Keep `DB_PASSWORD` and the password inside `DATABASE_URL` identical. Prefer lett
 docker compose -f docker-compose.aliyun.yml build
 docker compose -f docker-compose.aliyun.yml up -d postgres
 docker compose -f docker-compose.aliyun.yml --profile tools run --rm migrate
+docker compose -f docker-compose.aliyun.yml --profile tools run --rm migrate npm run admin:create
 docker compose -f docker-compose.aliyun.yml up -d app
 ```
 
@@ -172,6 +174,12 @@ git pull origin main
 docker compose -f docker-compose.aliyun.yml build
 docker compose -f docker-compose.aliyun.yml --profile tools run --rm migrate
 docker compose -f docker-compose.aliyun.yml up -d app
+```
+
+If you changed `ADMIN_PASSWORD` or need to reset the first admin account, run:
+
+```bash
+docker compose -f docker-compose.aliyun.yml --profile tools run --rm migrate npm run admin:create
 ```
 
 Use `--no-cache` only when changing base image dependencies or debugging stale Docker layers.
