@@ -39,6 +39,26 @@ Use `NEXT_PUBLIC_*` variables or private production commits to customize site na
 
 See [docs/TEMPLATE_USAGE.md](docs/TEMPLATE_USAGE.md) for the public-template/private-production workflow.
 
+## Production Deployment
+
+For an Aliyun ECS host where Nginx and Certbot run on the host and Docker runs only the app/PostgreSQL stack, use:
+
+```bash
+docker compose -f docker-compose.aliyun.yml build
+docker compose -f docker-compose.aliyun.yml up -d postgres
+docker compose -f docker-compose.aliyun.yml --profile tools run --rm migrate
+docker compose -f docker-compose.aliyun.yml up -d app
+```
+
+See [docs/ALIYUN_DEPLOYMENT.md](docs/ALIYUN_DEPLOYMENT.md).
+
+Database backup helpers:
+
+```bash
+./scripts/backup-db.sh
+./scripts/restore-db.sh backups/blog_db_YYYYMMDD_HHMMSS.dump
+```
+
 ## Safety
 
 Do not commit real `.env` files, backups, uploaded files, SMTP credentials, admin passwords, cron secrets, private knowledge paths, or production database dumps.

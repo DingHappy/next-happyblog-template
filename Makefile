@@ -3,6 +3,7 @@
 # 颜色定义
 GREEN  := $(shell tput -Txterm setaf 2)
 YELLOW := $(shell tput -Txterm setaf 3)
+RED    := $(shell tput -Txterm setaf 1)
 WHITE  := $(shell tput -Txterm setaf 7)
 RESET  := $(shell tput -Txterm sgr0)
 
@@ -38,6 +39,21 @@ init: ## 初始化部署环境（首次运行）
 build: ## 构建 Docker 镜像
 	@echo '${YELLOW}正在构建 Docker 镜像...${RESET}'
 	docker-compose build --no-cache
+
+aliyun-build: ## 构建阿里云部署镜像（宿主机 Nginx）
+	@echo '${YELLOW}正在构建阿里云部署镜像...${RESET}'
+	docker compose -f docker-compose.aliyun.yml build
+
+aliyun-up: ## 启动阿里云部署服务（app + postgres）
+	@echo '${YELLOW}正在启动阿里云部署服务...${RESET}'
+	docker compose -f docker-compose.aliyun.yml up -d postgres app
+
+aliyun-migrate: ## 运行阿里云部署数据库迁移
+	@echo '${YELLOW}正在运行阿里云部署数据库迁移...${RESET}'
+	docker compose -f docker-compose.aliyun.yml --profile tools run --rm migrate
+
+aliyun-logs: ## 查看阿里云部署应用日志
+	docker compose -f docker-compose.aliyun.yml logs -f app
 
 up: ## 启动服务（后台运行）
 	@echo '${YELLOW}正在启动服务...${RESET}'
@@ -90,18 +106,15 @@ psql: ## 连接到 PostgreSQL 数据库
 
 db-backup: ## 数据库备份
 	@echo '${YELLOW}正在备份数据库...${RESET}'
-	@mkdir -p backups
-	docker-compose exec -T postgres pg_dump -U ${DB_USER:-blog} ${DB_NAME:-blog_db} > backups/backup_$(shell date +%Y%m%d_%H%M%S).sql
-	@echo '${GREEN}✓ 数据库已备份到 backups/ 目录${RESET}'
+	./scripts/backup-db.sh
 
 db-restore: ## 数据库恢复（需指定 BACKUP_FILE=文件名）
 	@if [ -z "$(BACKUP_FILE)" ]; then \
-		echo '${YELLOW}使用方法: make db-restore BACKUP_FILE=backups/backup_xxx.sql${RESET}'; \
+		echo '${YELLOW}使用方法: make db-restore BACKUP_FILE=backups/blog_db_xxx.dump${RESET}'; \
 		exit 1; \
 	fi
 	@echo '${YELLOW}正在恢复数据库...${RESET}'
-	docker-compose exec -T postgres psql -U ${DB_USER:-blog} -d ${DB_NAME:-blog_db} < $(BACKUP_FILE)
-	@echo '${GREEN}✓ 数据库已恢复${RESET}'
+	./scripts/restore-db.sh $(BACKUP_FILE)
 
 db-migrate: ## 运行数据库迁移
 	@echo '${YELLOW}正在运行数据库迁移...${RESET}'

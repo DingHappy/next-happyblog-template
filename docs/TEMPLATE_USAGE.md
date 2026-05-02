@@ -63,6 +63,29 @@ npm run build
 
 Resolve conflicts only in private customization files. Keep production-only content isolated so future merges stay small.
 
+For Docker-based production, use the compose file that matches the host:
+
+```bash
+# Host Nginx owns ports 80/443, Docker runs only app and postgres.
+docker compose -f docker-compose.aliyun.yml build
+docker compose -f docker-compose.aliyun.yml up -d postgres
+docker compose -f docker-compose.aliyun.yml --profile tools run --rm migrate
+docker compose -f docker-compose.aliyun.yml up -d app
+```
+
+Before merging template updates into production, confirm the production repository has no uncommitted private changes:
+
+```bash
+git status --short
+```
+
+After merging, verify:
+
+```bash
+npm run lint
+npm run build
+```
+
 ## Recommended Private Files
 
 Common private-only files:
