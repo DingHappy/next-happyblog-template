@@ -9,6 +9,7 @@ type Options = {
   write: boolean;
   deleteExtra: boolean;
   verbose: boolean;
+  allowDirty: boolean;
 };
 
 type Summary = {
@@ -57,6 +58,7 @@ function parseArgs(argv: string[]): Options {
     write: false,
     deleteExtra: false,
     verbose: false,
+    allowDirty: false,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -75,6 +77,8 @@ function parseArgs(argv: string[]): Options {
       options.deleteExtra = true;
     } else if (arg === '--verbose') {
       options.verbose = true;
+    } else if (arg === '--allow-dirty') {
+      options.allowDirty = true;
     } else if (arg === '--help' || arg === '-h') {
       printHelp();
       process.exit(0);
@@ -104,6 +108,7 @@ Options:
   --write           Apply changes. Without this, only prints a dry-run report.
   --delete          Delete target files that no longer exist in the template, except protected paths.
   --verbose         Print unchanged and skipped files.
+  --allow-dirty     Allow syncing into a target worktree with uncommitted changes.
 `);
 }
 
@@ -113,6 +118,9 @@ function toRelative(root: string, filePath: string) {
 
 function isProtectedPath(relativePath: string) {
   if (!relativePath) return false;
+  if (/^prisma\/migrations\/[^/]+\/migration\.sql$/.test(relativePath)) {
+    return false;
+  }
   if (ALWAYS_SKIP.some((item) => relativePath === item || relativePath.startsWith(`${item}/`))) {
     return true;
   }
@@ -160,7 +168,7 @@ async function assertDirectory(filePath: string, label: string) {
   }
 }
 
-async function assertGitWorktreeClean(target: string) {
+async function assertGitWorktreeClean(target: string, allowDirty: boolean) {
   const gitDir = path.join(target, '.git');
   if (!(await exists(gitDir))) return;
 
@@ -174,7 +182,7 @@ async function assertGitWorktreeClean(target: string) {
     throw new Error(`Failed to inspect target git status:\n${result.stderr || result.stdout}`);
   }
 
-  if (result.stdout.trim()) {
+  if (result.stdout.trim() && !allowDirty) {
     throw new Error(
       `Target worktree has uncommitted changes. Commit or stash them first:\n${result.stdout}`
     );
@@ -197,7 +205,7 @@ async function deleteFile(targetRoot: string, relativePath: string, write: boole
 async function syncTemplate(options: Options) {
   await assertDirectory(options.source, 'Source');
   await assertDirectory(options.target, 'Target');
-  await assertGitWorktreeClean(options.target);
+  await assertGitWorktreeClean(options.target, options.allowDirty);
 
   const sourceFiles = await walkFiles(options.source);
   const targetFiles = await walkFiles(options.target);
@@ -267,6 +275,7 @@ async function main() {
   console.log(`Source: ${options.source}`);
   console.log(`Target: ${options.target}`);
   console.log(`Delete extra files: ${options.deleteExtra ? 'yes' : 'no'}`);
+  console.log(`Allow dirty target: ${options.allowDirty ? 'yes' : 'no'}`);
   console.log('');
   printList('Copied', summary.copied);
   printList('Updated', summary.updated);
