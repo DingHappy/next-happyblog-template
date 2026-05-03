@@ -41,11 +41,67 @@ NEXT_PUBLIC_AUTHOR_BIO="Your public bio"
 NEXT_PUBLIC_SOCIAL_GITHUB="https://github.com/your-name"
 ```
 
-For richer private customization, keep changes in your private production repository and merge template updates into it.
+For richer private customization, keep changes in your private production repository and sync template updates into it.
 
 ## Private Production Repository Flow
 
-Create a private production repository from this template, then add the public template as an upstream remote:
+Create a private production repository from this template.
+
+### Scripted Sync
+
+From the template repository, preview the files that would be copied into production:
+
+```bash
+npm run template:sync -- --target ../my-blog-production
+```
+
+Apply the sync:
+
+```bash
+npm run template:sync -- --target ../my-blog-production --write
+```
+
+Optionally delete target files that no longer exist in the template:
+
+```bash
+npm run template:sync -- --target ../my-blog-production --write --delete
+```
+
+The sync script refuses to run if the target git worktree has uncommitted changes. It also protects production-only paths:
+
+```text
+.env*
+public/uploads/
+uploads/
+backups/
+.git/
+node_modules/
+.next/
+```
+
+Environment examples are still synced:
+
+```text
+.env.example
+.env.local.example
+.env.production.example
+```
+
+After syncing, review and commit in the production repository:
+
+```bash
+cd ../my-blog-production
+git status --short
+npm install
+npx prisma migrate deploy
+npm run admin:create
+npm run lint
+npm run build
+```
+
+### Git Upstream Alternative
+
+You can also add the public template as an upstream remote:
 
 ```bash
 git remote add template git@github.com:your-name/my-blog-template.git
@@ -74,7 +130,7 @@ Prefer creating or resetting the first `superadmin` user explicitly with `npm ru
 The login route can still create the first `superadmin` user on first successful admin login with username `admin`.
 New password hashes use bcrypt. Legacy SHA256 hashes are still accepted and are upgraded automatically when a named user logs in successfully.
 
-Resolve conflicts only in private customization files. Keep production-only content isolated so future merges stay small.
+Resolve conflicts only in private customization files. Keep production-only content isolated so future syncs stay small.
 
 For Docker-based production, use the compose file that matches the host:
 

@@ -14,7 +14,8 @@
     "admin:create": "tsx scripts/create-admin.ts",
     "db:seed": "npx ts-node scripts/seed.ts",
     "db:studio": "prisma studio",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate",
+    "template:sync": "tsx scripts/sync-template.ts"
   },
   "dependencies": {
     "@prisma/client": "5.22.0",
