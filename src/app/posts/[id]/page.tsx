@@ -183,19 +183,27 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   }
 
   const postUrl = `/posts/${post.slug || post.id}`;
+  const metaTitle = post.seoTitle || post.title;
+  const metaDescription = post.seoDescription || post.excerpt;
+  const metaImage = post.ogImage || post.coverImage || undefined;
+  const canonicalUrl = post.canonicalUrl || postUrl;
 
   return {
-    title: `${post.title} - ${siteConfig.name}`,
-    description: post.excerpt,
+    title: `${metaTitle} - ${siteConfig.name}`,
+    description: metaDescription,
     alternates: {
-      canonical: postUrl,
+      canonical: canonicalUrl,
     },
+    robots: post.noIndex ? {
+      index: false,
+      follow: false,
+    } : undefined,
     openGraph: {
-      title: post.title,
-      description: post.excerpt,
+      title: metaTitle,
+      description: metaDescription,
       url: postUrl,
       type: 'article',
-      images: post.coverImage ? [post.coverImage] : undefined,
+      images: metaImage ? [metaImage] : undefined,
       publishedTime: post.createdAt.toISOString(),
       modifiedTime: post.updatedAt.toISOString(),
       section: post.category?.name,
@@ -205,9 +213,9 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     },
     twitter: {
       card: 'summary_large_image',
-      title: post.title,
-      description: post.excerpt,
-      images: post.coverImage ? [post.coverImage] : undefined,
+      title: metaTitle,
+      description: metaDescription,
+      images: metaImage ? [metaImage] : undefined,
     },
   };
 }
@@ -243,18 +251,20 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
 
   const headings = extractHeadings(post.content);
   const readingMinutes = Math.max(1, Math.ceil(post.content.length / 300));
+  const structuredDescription = post.seoDescription || post.excerpt;
+  const structuredImage = post.ogImage || post.coverImage || undefined;
 
   return (
     <>
       {/* SEO Structured Data */}
       <ArticleJsonLd
         title={post.title}
-        description={post.excerpt}
+        description={structuredDescription}
         url={`/posts/${post.slug || post.id}`}
         authorName={siteConfig.author.name}
         datePublished={post.createdAt.toISOString()}
         dateModified={post.updatedAt.toISOString()}
-        image={post.coverImage || undefined}
+        image={structuredImage}
         tags={post.tags.map(t => t.name)}
         category={post.category?.name}
       />

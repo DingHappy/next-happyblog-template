@@ -72,7 +72,17 @@ export async function PUT(
       );
     }
 
-    const { title, excerpt, content, tags: tagNames } = validation.normalized;
+    const {
+      title,
+      excerpt,
+      content,
+      tags: tagNames,
+      seoTitle,
+      seoDescription,
+      canonicalUrl,
+      ogImage,
+      noIndex,
+    } = validation.normalized;
     const slug = await buildUniquePostSlug(id, title, validation.normalized.slug);
 
     // 先获取当前文章，用于保存版本
@@ -115,6 +125,11 @@ export async function PUT(
           content,
           categoryId: body.categoryId || null,
           coverImage: body.coverImage || null,
+          seoTitle: seoTitle || null,
+          seoDescription: seoDescription || null,
+          canonicalUrl: canonicalUrl || null,
+          ogImage: ogImage || null,
+          noIndex,
           published: body.published ?? true,
           isPublic: body.isPublic ?? true,
           isPinned: body.isPinned ?? false,
@@ -138,6 +153,8 @@ export async function PUT(
       () => currentPost ? { title: currentPost.title, published: currentPost.published } : null,
       (result) => ({ id: result.id, title: result.title, published: result.published })
     );
+
+    await prisma.postDraft.deleteMany({ where: { postId: id } });
 
     return NextResponse.json(post);
   } catch (error) {

@@ -19,8 +19,8 @@ export async function POST(
     const existingComment = await prisma.comment.findUnique({
       where: { id },
       include: {
-        post: { select: { id: true, title: true } },
-        parent: { select: { author: true, email: true } },
+        post: { select: { id: true, title: true, slug: true } },
+        parent: { select: { author: true, email: true, content: true } },
       },
     });
 
@@ -39,8 +39,8 @@ export async function POST(
         where: { id },
         data: { approved: true, moderationReason: null },
         include: {
-          post: { select: { id: true, title: true } },
-          parent: { select: { author: true, email: true } },
+          post: { select: { id: true, title: true, slug: true } },
+          parent: { select: { author: true, email: true, content: true } },
         },
       }),
       () => ({ author: existingComment.author, approved: wasApproved }),
@@ -55,6 +55,7 @@ export async function POST(
           email: comment.email,
           content: comment.content,
           createdAt: comment.createdAt,
+          approved: comment.approved,
           post: comment.post,
           parent: comment.parent,
         });
@@ -71,6 +72,7 @@ export async function POST(
             post: comment.post,
             parentEmail: parent.email as string,
             parentAuthor: parent.author,
+            parentContent: parent.content,
           });
         });
       }

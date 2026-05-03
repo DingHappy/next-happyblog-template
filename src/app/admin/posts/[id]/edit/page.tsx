@@ -49,6 +49,11 @@ export default function EditPost({ params }: { params: Promise<{ id: string }> }
     categoryId: '',
     tags: '',
     coverImage: '',
+    seoTitle: '',
+    seoDescription: '',
+    canonicalUrl: '',
+    ogImage: '',
+    noIndex: false,
     published: true,
     isPublic: true,
     isPinned: false,
@@ -96,11 +101,45 @@ export default function EditPost({ params }: { params: Promise<{ id: string }> }
             categoryId: data.categoryId || '',
             tags: Array.isArray(data.tags) ? data.tags.map((tag: { name: string }) => tag.name).join(', ') : '',
             coverImage: data.coverImage || '',
+            seoTitle: data.seoTitle || '',
+            seoDescription: data.seoDescription || '',
+            canonicalUrl: data.canonicalUrl || '',
+            ogImage: data.ogImage || '',
+            noIndex: data.noIndex ?? false,
             published: data.published,
             isPublic: data.isPublic ?? true,
             isPinned: data.isPinned ?? false,
             scheduledAt: data.scheduledAt ? new Date(data.scheduledAt).toISOString().slice(0, 16) : '',
           });
+
+          const draftResponse = await fetch(`/api/admin/posts/${id}/autosave`);
+          if (draftResponse.ok) {
+            const draftData = await draftResponse.json();
+            const draft = draftData.draft;
+            if (draft) {
+              setFormData(prev => ({
+                ...prev,
+                title: draft.title || prev.title,
+                slug: draft.slug || '',
+                excerpt: draft.excerpt || '',
+                content: draft.content || '',
+                categoryId: draft.categoryId || '',
+                tags: draft.tags ? JSON.parse(draft.tags).join(', ') : '',
+                coverImage: draft.coverImage || '',
+                seoTitle: draft.seoTitle || '',
+                seoDescription: draft.seoDescription || '',
+                canonicalUrl: draft.canonicalUrl || '',
+                ogImage: draft.ogImage || '',
+                noIndex: draft.noIndex ?? false,
+                published: draft.published,
+                isPublic: draft.isPublic ?? true,
+                isPinned: draft.isPinned ?? false,
+                scheduledAt: draft.scheduledAt ? new Date(draft.scheduledAt).toISOString().slice(0, 16) : '',
+              }));
+              setLastSaved(new Date(draft.updatedAt));
+              toast('已恢复自动保存草稿', 'success');
+            }
+          }
         }
       } catch {
         toast('加载文章失败', 'error');
@@ -111,31 +150,30 @@ export default function EditPost({ params }: { params: Promise<{ id: string }> }
     loadPost();
   }, [params, toast]);
 
-  // 自动保存
+  // 自动保存草稿，不覆盖正式文章
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || isSaving || !postId || (!formData.title && !formData.content)) return;
 
-    const autoSaveInterval = setInterval(async () => {
-      if (!formData.title && !formData.content) return;
-      
+    const timer = window.setTimeout(async () => {
       setIsAutoSaving(true);
       try {
-        const { id } = await params;
-        await fetch(`/api/admin/posts/${id}`, {
+        const response = await fetch(`/api/admin/posts/${postId}/autosave`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData),
         });
-        setLastSaved(new Date());
+        if (response.ok) {
+          setLastSaved(new Date());
+        }
       } catch (error) {
         console.error('Auto save failed:', error);
       } finally {
         setIsAutoSaving(false);
       }
-    }, 30000); // 每30秒自动保存
+    }, 5000);
 
-    return () => clearInterval(autoSaveInterval);
-  }, [isLoading, formData, params]);
+    return () => window.clearTimeout(timer);
+  }, [isLoading, isSaving, formData, postId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -222,7 +260,7 @@ export default function EditPost({ params }: { params: Promise<{ id: string }> }
                )}
                {lastSaved && (
                  <span className="text-xs text-gray-500">
-                   上次保存: {lastSaved.toLocaleTimeString('zh-CN')}
+                   自动草稿: {lastSaved.toLocaleTimeString('zh-CN')}
                  </span>
                )}
                 <Link
@@ -368,6 +406,69 @@ export default function EditPost({ params }: { params: Promise<{ id: string }> }
                     )}
                   </div>
 
+                  <div className="pt-4 border-t border-gray-100">
+                    <h4 className="text-xs font-bold text-gray-700 mb-3">SEO 设置</h4>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-2">SEO 标题</label>
+                        <input
+                          type="text"
+                          value={formData.seoTitle}
+                          onChange={(e) => setFormData(prev => ({ ...prev, seoTitle: e.target.value }))}
+                          placeholder={formData.title || '默认使用文章标题'}
+                          maxLength={70}
+                          className="w-full px-4 py-2.5 bg-gray-50 rounded-xl border-2 border-transparent focus:border-purple-300 focus:bg-white outline-none transition-all text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-2">SEO 描述</label>
+                        <textarea
+                          value={formData.seoDescription}
+                          onChange={(e) => setFormData(prev => ({ ...prev, seoDescription: e.target.value }))}
+                          placeholder={formData.excerpt || '默认使用文章摘要'}
+                          maxLength={200}
+                          rows={3}
+                          className="w-full px-4 py-3 bg-gray-50 rounded-xl border-2 border-transparent focus:border-purple-300 focus:bg-white outline-none transition-all text-sm resize-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-2">Canonical URL</label>
+                        <input
+                          type="text"
+                          value={formData.canonicalUrl}
+                          onChange={(e) => setFormData(prev => ({ ...prev, canonicalUrl: e.target.value }))}
+                          placeholder="/posts/my-post 或 https://example.com/posts/my-post"
+                          className="w-full px-4 py-2.5 bg-gray-50 rounded-xl border-2 border-transparent focus:border-purple-300 focus:bg-white outline-none transition-all text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-2">Open Graph 图片</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={formData.ogImage}
+                            onChange={(e) => setFormData(prev => ({ ...prev, ogImage: e.target.value }))}
+                            placeholder={formData.coverImage || '默认使用封面图'}
+                            className="min-w-0 flex-1 px-4 py-2.5 bg-gray-50 rounded-xl border-2 border-transparent focus:border-purple-300 focus:bg-white outline-none transition-all text-sm"
+                          />
+                          <MediaPicker onSelect={(url) => setFormData(prev => ({ ...prev, ogImage: url }))} />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          id="noIndex"
+                          checked={formData.noIndex}
+                          onChange={(e) => setFormData(prev => ({ ...prev, noIndex: e.target.checked }))}
+                          className="w-4 h-4 text-purple-600 rounded"
+                        />
+                        <label htmlFor="noIndex" className="text-sm font-medium text-gray-700">
+                          不允许搜索引擎索引
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
                    <div className="flex items-center gap-3">
                      <input
                        type="checkbox"
@@ -425,7 +526,7 @@ export default function EditPost({ params }: { params: Promise<{ id: string }> }
                <PostQualityPanel
                  title={formData.title}
                  slug={formData.slug}
-                 excerpt={formData.excerpt}
+                 excerpt={formData.seoDescription || formData.excerpt}
                  content={formData.content}
                  tags={formData.tags}
                  onApplySlug={(slug) => setFormData(prev => ({ ...prev, slug }))}

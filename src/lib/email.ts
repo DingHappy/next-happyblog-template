@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { absoluteUrl } from '@/lib/site';
 
 interface EmailOptions {
   to: string;
@@ -54,6 +55,16 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
   }
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/\n/g, '<br />');
+}
+
 export async function sendCommentReplyNotification(
   postTitle: string,
   postUrl: string,
@@ -69,13 +80,13 @@ export async function sendCommentReplyNotification(
       <h2>你在「${postTitle}」的评论收到了新回复</h2>
 
       <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
-        <p style="margin: 0 0 10px 0;"><strong>${commentAuthor}</strong> 的评论：</p>
-        <p style="margin: 0;">${commentContent}</p>
+        <p style="margin: 0 0 10px 0;"><strong>${escapeHtml(commentAuthor)}</strong> 的评论：</p>
+        <p style="margin: 0;">${escapeHtml(commentContent)}</p>
       </div>
 
       <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin: 20px 0;">
-        <p style="margin: 0 0 10px 0;"><strong>${replyAuthor}</strong> 的回复：</p>
-        <p style="margin: 0;">${replyContent}</p>
+        <p style="margin: 0 0 10px 0;"><strong>${escapeHtml(replyAuthor)}</strong> 的回复：</p>
+        <p style="margin: 0;">${escapeHtml(replyContent)}</p>
       </div>
 
       <p>
@@ -107,11 +118,11 @@ export async function sendNewCommentNotificationToAdmin(
     <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
       <h2>博客文章收到新评论</h2>
 
-      <p><strong>文章：</strong>${postTitle}</p>
-      <p><strong>评论者：</strong>${commentAuthor}</p>
+      <p><strong>文章：</strong>${escapeHtml(postTitle)}</p>
+      <p><strong>评论者：</strong>${escapeHtml(commentAuthor)}</p>
 
       <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
-        <p style="margin: 0;">${commentContent}</p>
+        <p style="margin: 0;">${escapeHtml(commentContent)}</p>
       </div>
 
       <p>
@@ -136,19 +147,23 @@ interface NewCommentNotificationParams {
   email: string | null;
   content: string;
   createdAt: Date;
-  post: { id: string; title: string };
-  parent: { author: string; email: string | null } | null;
+  approved: boolean;
+  post: { id: string; title: string; slug?: string | null };
+  parent: { author: string; email: string | null; content: string } | null;
 }
 
 export async function sendNewCommentNotification(params: NewCommentNotificationParams): Promise<boolean> {
   const adminEmail = process.env.ADMIN_EMAIL;
   if (!adminEmail) return false;
+  const postPath = `/posts/${params.post.slug || params.post.id}`;
+  const statusText = params.approved ? '已通过审核' : '待审核';
+  const prefix = params.parent ? `回复了 ${params.parent.author}` : '发表了新评论';
 
   return sendNewCommentNotificationToAdmin(
-    params.post.title,
-    `${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/posts/${params.post.id}`,
+    `${params.post.title}（${statusText}）`,
+    absoluteUrl(postPath),
     params.author,
-    params.content,
+    `${prefix}\n\n${params.content}`,
     adminEmail
   );
 }
@@ -157,17 +172,18 @@ interface ReplyNotificationParams {
   author: string;
   content: string;
   createdAt: Date;
-  post: { id: string; title: string };
+  post: { id: string; title: string; slug?: string | null };
   parentEmail: string;
   parentAuthor: string;
+  parentContent: string;
 }
 
 export async function sendReplyNotification(params: ReplyNotificationParams): Promise<boolean> {
   return sendCommentReplyNotification(
     params.post.title,
-    `${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/posts/${params.post.id}`,
+    absoluteUrl(`/posts/${params.post.slug || params.post.id}`),
     params.parentAuthor,
-    '...',
+    params.parentContent,
     params.author,
     params.content,
     params.parentEmail

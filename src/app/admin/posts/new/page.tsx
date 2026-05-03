@@ -20,6 +20,54 @@ interface Category {
   children: Category[];
 }
 
+const NEW_POST_DRAFT_KEY = 'new-post-autosave-draft';
+
+const emptyPostFormData = {
+  title: '',
+  slug: '',
+  excerpt: '',
+  content: '',
+  categoryId: '',
+  tags: '',
+  coverImage: '',
+  seoTitle: '',
+  seoDescription: '',
+  canonicalUrl: '',
+  ogImage: '',
+  noIndex: false,
+  published: true,
+  isPublic: true,
+  isPinned: false,
+  scheduledAt: '',
+};
+
+type PostFormData = typeof emptyPostFormData;
+
+function readNewPostDraft(): { formData: PostFormData; savedAt: Date | null } {
+  if (typeof window === 'undefined') {
+    return { formData: emptyPostFormData, savedAt: null };
+  }
+
+  const savedDraft = window.localStorage.getItem(NEW_POST_DRAFT_KEY);
+  if (!savedDraft) {
+    return { formData: emptyPostFormData, savedAt: null };
+  }
+
+  try {
+    const parsed = JSON.parse(savedDraft);
+    if (parsed?.formData && (parsed.formData.title || parsed.formData.content)) {
+      return {
+        formData: { ...emptyPostFormData, ...parsed.formData } as PostFormData,
+        savedAt: parsed.savedAt ? new Date(parsed.savedAt) : null,
+      };
+    }
+  } catch {
+    window.localStorage.removeItem(NEW_POST_DRAFT_KEY);
+  }
+
+  return { formData: emptyPostFormData, savedAt: null };
+}
+
 function flattenCategories(categories: Category[], result: Category[] = []): Category[] {
   for (const cat of categories) {
     result.push(cat);
@@ -33,22 +81,12 @@ function flattenCategories(categories: Category[], result: Category[] = []): Cat
 export default function NewPost() {
   const router = useRouter();
   const toast = useToast();
+  const [initialDraft] = useState(readNewPostDraft);
   const [activeTab, setActiveTab] = useState<'edit' | 'preview'>('edit');
   const [isSaving, setIsSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(initialDraft.savedAt);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [formData, setFormData] = useState({
-    title: '',
-    slug: '',
-    excerpt: '',
-    content: '',
-    categoryId: '',
-    tags: '',
-    coverImage: '',
-    published: true,
-    isPublic: true,
-    isPinned: false,
-    scheduledAt: '',
-  });
+  const [formData, setFormData] = useState<PostFormData>(initialDraft.formData);
 
   // 检查管理员权限
   useEffect(() => {
@@ -72,6 +110,18 @@ export default function NewPost() {
       .then(data => setCategories(data))
       .catch(console.error);
   }, []);
+
+  useEffect(() => {
+    if (isSaving || (!formData.title && !formData.content)) return;
+
+    const timer = window.setTimeout(() => {
+      const savedAt = new Date();
+      window.localStorage.setItem(NEW_POST_DRAFT_KEY, JSON.stringify({ formData, savedAt: savedAt.toISOString() }));
+      setLastSaved(savedAt);
+    }, 5000);
+
+    return () => window.clearTimeout(timer);
+  }, [formData, isSaving]);
 
   const updateContent = (content: string) => {
     setFormData(prev => {
@@ -107,6 +157,7 @@ export default function NewPost() {
       });
 
       if (response.ok) {
+        window.localStorage.removeItem(NEW_POST_DRAFT_KEY);
         toast('文章已创建', 'success');
         router.push('/admin/posts');
       } else {
@@ -194,6 +245,11 @@ export default function NewPost() {
               </button>
             </div>
           </div>
+          {lastSaved && (
+            <p className="mt-2 text-right text-xs text-gray-500">
+              本地草稿已自动保存：{lastSaved.toLocaleTimeString('zh-CN')}
+            </p>
+          )}
         </div>
       </header>
 
@@ -303,6 +359,69 @@ export default function NewPost() {
                     )}
                   </div>
 
+                  <div className="pt-4 border-t border-gray-100">
+                    <h4 className="text-xs font-bold text-gray-700 mb-3">SEO 设置</h4>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-2">SEO 标题</label>
+                        <input
+                          type="text"
+                          value={formData.seoTitle}
+                          onChange={(e) => setFormData(prev => ({ ...prev, seoTitle: e.target.value }))}
+                          placeholder={formData.title || '默认使用文章标题'}
+                          maxLength={70}
+                          className="w-full px-4 py-2.5 bg-gray-50 rounded-xl border-2 border-transparent focus:border-purple-300 focus:bg-white outline-none transition-all text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-2">SEO 描述</label>
+                        <textarea
+                          value={formData.seoDescription}
+                          onChange={(e) => setFormData(prev => ({ ...prev, seoDescription: e.target.value }))}
+                          placeholder={formData.excerpt || '默认使用文章摘要'}
+                          maxLength={200}
+                          rows={3}
+                          className="w-full px-4 py-3 bg-gray-50 rounded-xl border-2 border-transparent focus:border-purple-300 focus:bg-white outline-none transition-all text-sm resize-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-2">Canonical URL</label>
+                        <input
+                          type="text"
+                          value={formData.canonicalUrl}
+                          onChange={(e) => setFormData(prev => ({ ...prev, canonicalUrl: e.target.value }))}
+                          placeholder="/posts/my-post 或 https://example.com/posts/my-post"
+                          className="w-full px-4 py-2.5 bg-gray-50 rounded-xl border-2 border-transparent focus:border-purple-300 focus:bg-white outline-none transition-all text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-2">Open Graph 图片</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={formData.ogImage}
+                            onChange={(e) => setFormData(prev => ({ ...prev, ogImage: e.target.value }))}
+                            placeholder={formData.coverImage || '默认使用封面图'}
+                            className="min-w-0 flex-1 px-4 py-2.5 bg-gray-50 rounded-xl border-2 border-transparent focus:border-purple-300 focus:bg-white outline-none transition-all text-sm"
+                          />
+                          <MediaPicker onSelect={(url) => setFormData(prev => ({ ...prev, ogImage: url }))} />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          id="noIndex"
+                          checked={formData.noIndex}
+                          onChange={(e) => setFormData(prev => ({ ...prev, noIndex: e.target.checked }))}
+                          className="w-4 h-4 text-purple-600 rounded"
+                        />
+                        <label htmlFor="noIndex" className="text-sm font-medium text-gray-700">
+                          不允许搜索引擎索引
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="flex items-center gap-3">
                     <input
                       type="checkbox"
@@ -372,7 +491,7 @@ export default function NewPost() {
               <PostQualityPanel
                 title={formData.title}
                 slug={formData.slug}
-                excerpt={formData.excerpt}
+                excerpt={formData.seoDescription || formData.excerpt}
                 content={formData.content}
                 tags={formData.tags}
                 onApplySlug={(slug) => setFormData(prev => ({ ...prev, slug }))}

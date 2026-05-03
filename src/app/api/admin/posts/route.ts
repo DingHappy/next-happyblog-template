@@ -59,7 +59,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const { title, excerpt, content, tags: tagNames } = validation.normalized;
+    const {
+      title,
+      excerpt,
+      content,
+      tags: tagNames,
+      seoTitle,
+      seoDescription,
+      canonicalUrl,
+      ogImage,
+      noIndex,
+    } = validation.normalized;
     const slug = await buildUniquePostSlug(title, validation.normalized.slug);
 
     const post = await withAuditLog(
@@ -72,6 +82,11 @@ export async function POST(request: Request) {
           content,
           categoryId: body.categoryId || null,
           coverImage: body.coverImage || null,
+          seoTitle: seoTitle || null,
+          seoDescription: seoDescription || null,
+          canonicalUrl: canonicalUrl || null,
+          ogImage: ogImage || null,
+          noIndex,
           published: body.published ?? true,
           isPublic: body.isPublic ?? true,
           isPinned: body.isPinned ?? false,

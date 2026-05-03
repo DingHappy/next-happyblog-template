@@ -90,11 +90,11 @@ export async function POST(request: Request) {
     const moderation = moderateComment({ author, email: email ?? null, content });
 
     // 获取被回复评论的信息（如果有）
-    let parentComment: { author: string; email: string | null } | null = null;
+    let parentComment: { author: string; email: string | null; content: string } | null = null;
     if (parentId) {
       parentComment = await prisma.comment.findUnique({
         where: { id: parentId },
-        select: { author: true, email: true },
+        select: { author: true, email: true, content: true },
       });
     }
 
@@ -114,25 +114,25 @@ export async function POST(request: Request) {
           orderBy: { createdAt: 'asc' },
         },
         post: {
-          select: { id: true, title: true },
+          select: { id: true, title: true, slug: true },
         },
       },
     });
 
     // 异步发送邮件通知，不阻塞响应
-    if (comment.approved) {
-      // 发送通知给博主
-      setImmediate(() => {
-        void sendNewCommentNotification({
-          author: comment.author,
-          email: comment.email,
-          content: comment.content,
-          createdAt: comment.createdAt,
-          post: comment.post,
-          parent: parentComment,
-        });
+    setImmediate(() => {
+      void sendNewCommentNotification({
+        author: comment.author,
+        email: comment.email,
+        content: comment.content,
+        createdAt: comment.createdAt,
+        approved: comment.approved,
+        post: comment.post,
+        parent: parentComment,
       });
+    });
 
+    if (comment.approved) {
       // 如果是回复且被回复者留了邮箱，发送通知给被回复的人
       if (parentComment && parentComment.email) {
         setImmediate(() => {
@@ -143,6 +143,7 @@ export async function POST(request: Request) {
             post: comment.post,
             parentEmail: parentComment.email as string,
             parentAuthor: parentComment.author,
+            parentContent: parentComment.content,
           });
         });
       }

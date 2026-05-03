@@ -9,6 +9,11 @@ export interface PostValidationInput {
   published?: boolean;
   scheduledAt?: string | Date | null;
   coverImage?: string | null;
+  seoTitle?: string | null;
+  seoDescription?: string | null;
+  canonicalUrl?: string | null;
+  ogImage?: string | null;
+  noIndex?: boolean;
 }
 
 export interface PostValidationResult {
@@ -20,6 +25,11 @@ export interface PostValidationResult {
     excerpt: string;
     content: string;
     tags: string[];
+    seoTitle: string;
+    seoDescription: string;
+    canonicalUrl: string;
+    ogImage: string;
+    noIndex: boolean;
   };
 }
 
@@ -75,6 +85,11 @@ export function validatePostInput(input: PostValidationInput): PostValidationRes
   const excerpt = String(input.excerpt || '').trim() || generateExcerpt(content);
   const tags = normalizeTagNames(input.tags);
   const scheduledAt = input.scheduledAt ? new Date(input.scheduledAt) : null;
+  const seoTitle = String(input.seoTitle || '').trim();
+  const seoDescription = String(input.seoDescription || '').trim();
+  const canonicalUrl = String(input.canonicalUrl || '').trim();
+  const ogImage = String(input.ogImage || '').trim();
+  const noIndex = input.noIndex === true;
 
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -86,6 +101,10 @@ export function validatePostInput(input: PostValidationInput): PostValidationRes
   if (slug.length > 96) errors.push('文章 slug 不能超过 96 个字符');
   if (!/^[\w\u4e00-\u9fa5-]+$/.test(slug)) errors.push('文章 slug 只能包含字母、数字、中文、下划线和短横线');
   if (excerpt.length > 220) errors.push('文章摘要不能超过 220 个字');
+  if (seoTitle.length > 70) errors.push('SEO 标题不能超过 70 个字');
+  if (seoDescription.length > 200) errors.push('SEO 描述不能超过 200 个字');
+  if (canonicalUrl && !isValidHttpOrRelativeUrl(canonicalUrl)) errors.push('Canonical URL 格式不正确');
+  if (ogImage && !isValidHttpOrRelativeUrl(ogImage)) errors.push('Open Graph 图片 URL 格式不正确');
   if (scheduledAt && Number.isNaN(scheduledAt.getTime())) errors.push('定时发布时间格式不正确');
 
   if (title && title.length < 5) warnings.push('标题偏短，建议至少 5 个字');
@@ -101,6 +120,8 @@ export function validatePostInput(input: PostValidationInput): PostValidationRes
   if (input.published && !input.coverImage) {
     warnings.push('建议为已发布文章设置封面图，提升首页列表和分享效果');
   }
+  if (seoTitle && seoTitle.length < 20) warnings.push('SEO 标题偏短，建议 20-60 字');
+  if (seoDescription && seoDescription.length < 50) warnings.push('SEO 描述偏短，建议 50-160 字');
 
   return {
     errors,
@@ -111,6 +132,21 @@ export function validatePostInput(input: PostValidationInput): PostValidationRes
       excerpt,
       content,
       tags,
+      seoTitle,
+      seoDescription,
+      canonicalUrl,
+      ogImage,
+      noIndex,
     },
   };
+}
+
+function isValidHttpOrRelativeUrl(value: string): boolean {
+  if (value.startsWith('/')) return true;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
 }
