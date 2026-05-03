@@ -1,15 +1,16 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAuth, unauthorizedResponse } from '@/lib/auth';
 import { withAuditLog } from '@/lib/audit';
 import { sendNewCommentNotification, sendReplyNotification } from '@/lib/email';
+import { requirePermission } from '@/lib/permissions';
 
 // 审核通过评论
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!(await requireAuth())) return unauthorizedResponse();
+  const auth = await requirePermission('comments:moderate');
+  if (!auth.ok) return auth.response;
 
   try {
     const { id } = await params;
@@ -36,7 +37,7 @@ export async function POST(
       { action: 'approve', resource: 'comment', resourceId: id },
       () => prisma.comment.update({
         where: { id },
-        data: { approved: true },
+        data: { approved: true, moderationReason: null },
         include: {
           post: { select: { id: true, title: true } },
           parent: { select: { author: true, email: true } },
@@ -90,7 +91,8 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!(await requireAuth())) return unauthorizedResponse();
+  const auth = await requirePermission('comments:moderate');
+  if (!auth.ok) return auth.response;
 
   try {
     const { id } = await params;

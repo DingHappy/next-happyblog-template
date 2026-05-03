@@ -98,6 +98,7 @@ model Comment {
   email     String?
   content   String
   approved  Boolean  @default(true)
+  moderationReason String?
   createdAt DateTime @default(now())
   post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
   parent    Comment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)

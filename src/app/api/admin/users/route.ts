@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireRole, hashPassword, unauthorizedResponse, type UserRole } from '@/lib/auth';
+import { hashPassword, type UserRole } from '@/lib/auth';
 import { withAuditLog } from '@/lib/audit';
+import { requirePermission } from '@/lib/permissions';
 
 export async function GET() {
-  if (!(await requireRole('superadmin'))) return unauthorizedResponse();
+  const auth = await requirePermission('users:manage');
+  if (!auth.ok) return auth.response;
 
   const users = await prisma.user.findMany({
     select: {
@@ -25,7 +27,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!(await requireRole('superadmin'))) return unauthorizedResponse();
+  const auth = await requirePermission('users:manage');
+  if (!auth.ok) return auth.response;
 
   const body = await request.json();
   const { username, email, password, role, displayName, avatar, bio } = body;

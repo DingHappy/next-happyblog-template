@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server';
 import type { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
-import { requireRole, hashPassword, forbiddenResponse, unauthorizedResponse, getCurrentUser, hasPermission, type UserRole } from '@/lib/auth';
+import { hashPassword, forbiddenResponse, getCurrentUser, hasPermission, type UserRole } from '@/lib/auth';
 import { withAuditLog } from '@/lib/audit';
+import { requirePermission } from '@/lib/permissions';
 
 type Params = Promise<{ id: string }>;
 
 export async function GET(request: Request, { params }: { params: Params }) {
-  if (!(await requireRole('superadmin'))) return unauthorizedResponse();
+  const auth = await requirePermission('users:manage');
+  if (!auth.ok) return auth.response;
 
   const { id } = await params;
   const user = await prisma.user.findUnique({
@@ -33,7 +35,8 @@ export async function GET(request: Request, { params }: { params: Params }) {
 }
 
 export async function PATCH(request: Request, { params }: { params: Params }) {
-  if (!(await requireRole('superadmin'))) return unauthorizedResponse();
+  const auth = await requirePermission('users:manage');
+  if (!auth.ok) return auth.response;
 
   const { id } = await params;
   const body = await request.json();
@@ -88,7 +91,8 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
 }
 
 export async function DELETE(request: Request, { params }: { params: Params }) {
-  if (!(await requireRole('superadmin'))) return unauthorizedResponse();
+  const auth = await requirePermission('users:manage');
+  if (!auth.ok) return auth.response;
 
   const { id } = await params;
   const currentUser = await getCurrentUser();

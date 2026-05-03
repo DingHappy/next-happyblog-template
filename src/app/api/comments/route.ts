@@ -1,22 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { sendNewCommentNotification, sendReplyNotification } from '@/lib/email';
-
-// 垃圾评论关键词黑名单
-const SPAM_KEYWORDS = [
-  'http://', 'https://', 'www.', '.com', '.cn', '.net', '.org',
-  '减肥', '祛痘', '祛斑', '丰胸', '壮阳', '伟哥',
-  '贷款', '放贷', '套现', '信用卡', '博彩', '赌博',
-  '赚钱', '兼职', '日赚', '月入', '加微信', '加V',
-  'seo', '优化', '排名', '代运营', '刷流量',
-  'fuck', 'shit', 'porn', 'sex', 'bitch',
-  '垃圾广告', '测试测试', '111', '222', '333',
-  '...', '。。。', '，，，', '，，，，',
-].map(w => w.toLowerCase());
-
-const SPAM_EMAIL_DOMAINS = [
-  'temp-mail.org', 'mailinator.com', '10minutemail.com',
-].map(d => d.toLowerCase());
+import { moderateComment } from '@/lib/comment-moderation';
 
 // 频率限制：同一个 IP 1 分钟内最多 3 条
 const RATE_LIMIT_MS = 60 * 1000;
@@ -41,25 +26,6 @@ function isRateLimited(ip: string | null): boolean {
   }
   recent.push(now);
   recentByIp.set(ip, recent);
-  return false;
-}
-
-// 内容嫌疑度：命中 → 标记为待审核，但不直接拒绝
-function looksSpammy(email: string | null, content: string): boolean {
-  if (content.length < 2 || content.length > 2000) return true;
-
-  const contentLower = content.toLowerCase();
-  const matches = SPAM_KEYWORDS.filter((k) => contentLower.includes(k));
-  if (matches.length >= 2) return true;
-
-  if (email) {
-    const domain = email.split('@')[1]?.toLowerCase();
-    if (domain && SPAM_EMAIL_DOMAINS.some((d) => domain.includes(d))) return true;
-  }
-
-  if (/(.)\1{4,}/.test(content)) return true;
-  if (/^[^a-zA-Z一-龥]*$/.test(content.replace(/\s/g, ''))) return true;
-
   return false;
 }
 
@@ -145,8 +111,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // 内容嫌疑度：标记待审核
-    const suspicious = looksSpammy(email ?? null, content);
+    const moderation = moderateComment({ author, email: email ?? null, content });
 
     // 获取被回复评论的信息（如果有）
     let parentComment: { author: string; email: string | null } | null = null;
@@ -164,7 +129,8 @@ export async function POST(request: Request) {
         author,
         email,
         content,
-        approved: !suspicious,
+        approved: moderation.approved,
+        moderationReason: moderation.reason,
       },
       include: {
         replies: {
@@ -206,7 +172,11 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json(comment, { status: 201 });
+    return NextResponse.json({
+      ...comment,
+      moderationReason: undefined,
+      message: comment.approved ? '评论提交成功' : '评论已提交，审核后显示',
+    }, { status: 201 });
   } catch (error) {
     console.error('Create comment error:', error);
     return NextResponse.json(

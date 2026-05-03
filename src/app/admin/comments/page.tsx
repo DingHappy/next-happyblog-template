@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import type { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
-import { requireAuth } from '@/lib/auth';
+import { getCurrentUser } from '@/lib/auth';
+import { userCan } from '@/lib/permissions';
 import CommentActionButton from '@/components/CommentActionButton';
 import AdminSidebar from '@/components/AdminSidebar';
 
@@ -20,7 +21,8 @@ type AdminComment = Prisma.CommentGetPayload<{
 }>;
 
 export default async function AdminComments() {
-  if (!(await requireAuth())) {
+  const user = await getCurrentUser();
+  if (!user || !userCan(user, 'comments:moderate')) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center">
         <div className="text-center">
@@ -149,6 +151,11 @@ export default async function AdminComments() {
                       }`}>
                         {comment.approved ? '✅ 已审核' : '⏳ 待审核'}
                       </span>
+                      {!comment.approved && comment.moderationReason && (
+                        <p className="mt-2 max-w-40 text-xs leading-5 text-amber-600 dark:text-amber-300">
+                          {comment.moderationReason}
+                        </p>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <p className="text-sm text-gray-600 dark:text-gray-400">

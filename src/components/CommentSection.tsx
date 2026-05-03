@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useToast } from '@/components/FeedbackProvider';
 
 interface Comment {
   id: string;
@@ -21,6 +22,7 @@ interface CommentSectionProps {
 }
 
 export default function CommentSection({ postId, initialComments }: CommentSectionProps) {
+  const toast = useToast();
   const [comments, setComments] = useState<Comment[]>(initialComments);
   const [formData, setFormData] = useState({
     author: '',
@@ -79,13 +81,17 @@ export default function CommentSection({ postId, initialComments }: CommentSecti
       });
 
       if (response.ok) {
+        const data = await response.json().catch(() => null);
         setFormData({ author: '', email: '', content: '', website: '' });
         setReplyTo(null);
-        alert(replyTo ? '✅ 回复提交成功！需要审核后才会显示。' : '✅ 评论提交成功！需要审核后才会显示。');
+        toast(data?.message || (replyTo ? '回复提交成功，审核后显示' : '评论提交成功，审核后显示'), 'success');
       } else if (response.status === 429) {
-        alert('⏳ 评论过于频繁，请稍后再试。');
+        toast('评论过于频繁，请稍后再试', 'error');
       } else if (response.status === 404) {
-        alert('❌ 回复的评论不存在。');
+        toast('回复的评论不存在', 'error');
+      } else {
+        const data = await response.json().catch(() => ({}));
+        toast(data.error || '评论提交失败', 'error');
       }
     } catch (error) {
       console.error('Failed to submit comment:', error);

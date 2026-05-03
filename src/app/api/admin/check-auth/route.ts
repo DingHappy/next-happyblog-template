@@ -1,13 +1,18 @@
 import { NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth';
+import { getCurrentUser } from '@/lib/auth';
+import { getPermissionsForRole } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const isAuthenticated = await requireAuth();
+  const user = await getCurrentUser();
 
-  if (isAuthenticated) {
-    return NextResponse.json({ authenticated: true });
+  if (user) {
+    return NextResponse.json({
+      authenticated: true,
+      user,
+      permissions: getPermissionsForRole(user.role),
+    });
   }
 
   return NextResponse.json(

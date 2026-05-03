@@ -13,9 +13,14 @@ export default function CommentActionButton({ commentId, approved }: CommentActi
 
   const handleApprove = async () => {
     try {
-      await fetch(`/api/admin/comments/${commentId}/approve`, { method: 'POST' });
-      toast('评论已通过', 'success');
-      window.location.reload();
+      const response = await fetch(`/api/admin/comments/${commentId}`, { method: 'POST' });
+      if (response.ok) {
+        toast('评论已通过', 'success');
+        window.location.reload();
+      } else {
+        const data = await response.json().catch(() => ({}));
+        toast(data.error || '操作失败', 'error');
+      }
     } catch (error) {
       console.error('Failed to approve comment:', error);
       toast('操作失败', 'error');
@@ -27,9 +32,14 @@ export default function CommentActionButton({ commentId, approved }: CommentActi
     if (!ok) return;
 
     try {
-      await fetch(`/api/admin/comments/${commentId}`, { method: 'DELETE' });
-      toast('评论已删除', 'success');
-      window.location.reload();
+      const response = await fetch(`/api/admin/comments/${commentId}`, { method: 'DELETE' });
+      if (response.ok) {
+        toast('评论已删除', 'success');
+        window.location.reload();
+      } else {
+        const data = await response.json().catch(() => ({}));
+        toast(data.error || '删除失败', 'error');
+      }
     } catch (error) {
       console.error('Failed to delete comment:', error);
       toast('删除失败', 'error');

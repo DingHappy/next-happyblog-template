@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
-import { requireRole, unauthorizedResponse } from '@/lib/auth';
 import { createAuditLog } from '@/lib/audit';
+import { requirePermission } from '@/lib/permissions';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -127,7 +127,8 @@ function resolveBackupPath(filename: string) {
 }
 
 export async function GET() {
-  if (!(await requireRole('superadmin'))) return unauthorizedResponse();
+  const auth = await requirePermission('backup:manage');
+  if (!auth.ok) return auth.response;
 
   try {
     const { backupData, filename } = await saveBackupFile();
@@ -153,7 +154,8 @@ export async function GET() {
 }
 
 export async function PATCH() {
-  if (!(await requireRole('superadmin'))) return unauthorizedResponse();
+  const auth = await requirePermission('backup:manage');
+  if (!auth.ok) return auth.response;
 
   try {
     await ensureBackupDir();
@@ -186,7 +188,8 @@ export async function PATCH() {
 }
 
 export async function POST(request: Request) {
-  if (!(await requireRole('superadmin'))) return unauthorizedResponse();
+  const auth = await requirePermission('backup:manage');
+  if (!auth.ok) return auth.response;
 
   try {
     const formData = await request.formData();
@@ -255,7 +258,8 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  if (!(await requireRole('superadmin'))) return unauthorizedResponse();
+  const auth = await requirePermission('backup:manage');
+  if (!auth.ok) return auth.response;
 
   try {
     const url = new URL(request.url);

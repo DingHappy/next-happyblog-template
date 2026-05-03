@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getSettings, updateSettings } from '@/lib/settings';
-import { requireRole, unauthorizedResponse } from '@/lib/auth';
 import { createAuditLog } from '@/lib/audit';
+import { requirePermission } from '@/lib/permissions';
 
 export async function GET() {
-  if (!await requireRole('superadmin')) {
-    return unauthorizedResponse();
-  }
+  const auth = await requirePermission('settings:manage');
+  if (!auth.ok) return auth.response;
 
   try {
     const settings = await getSettings();
@@ -21,9 +20,8 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
-  if (!await requireRole('superadmin')) {
-    return unauthorizedResponse();
-  }
+  const auth = await requirePermission('settings:manage');
+  if (!auth.ok) return auth.response;
 
   try {
     const body = await request.json();

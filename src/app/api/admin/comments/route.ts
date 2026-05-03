@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
 import type { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
-import { requireAuth, unauthorizedResponse } from '@/lib/auth';
 import { createAuditLog } from '@/lib/audit';
+import { requirePermission } from '@/lib/permissions';
 
 // 获取所有评论（支持搜索、筛选）
 export async function GET(request: Request) {
-  if (!(await requireAuth())) return unauthorizedResponse();
+  const auth = await requirePermission('comments:moderate');
+  if (!auth.ok) return auth.response;
 
   try {
     const { searchParams } = new URL(request.url);
@@ -68,7 +69,8 @@ export async function GET(request: Request) {
 
 // 批量操作（审核、删除）
 export async function POST(request: Request) {
-  if (!(await requireAuth())) return unauthorizedResponse();
+  const auth = await requirePermission('comments:moderate');
+  if (!auth.ok) return auth.response;
 
   try {
     const { action, ids } = await request.json();
@@ -83,11 +85,22 @@ export async function POST(request: Request) {
     if (action === 'approve') {
       await prisma.comment.updateMany({
         where: { id: { in: ids } },
-        data: { approved: true },
+        data: { approved: true, moderationReason: null },
       });
 
       await createAuditLog({
         action: 'approve',
+        resource: 'comment',
+        newData: { count: ids.length, ids },
+      });
+    } else if (action === 'reject') {
+      await prisma.comment.updateMany({
+        where: { id: { in: ids } },
+        data: { approved: false, moderationReason: '管理员退回' },
+      });
+
+      await createAuditLog({
+        action: 'reject',
         resource: 'comment',
         newData: { count: ids.length, ids },
       });

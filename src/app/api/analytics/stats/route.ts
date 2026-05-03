@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAuth } from '@/lib/auth';
+import { requirePermission } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -85,10 +85,8 @@ function percentChange(current: number, previous: number) {
 }
 
 export async function GET(req: Request) {
-  const isAuthenticated = await requireAuth();
-  if (!isAuthenticated) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const auth = await requirePermission('analytics:read');
+  if (!auth.ok) return auth.response;
 
   try {
     const days = parseDays(req.url);

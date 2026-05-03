@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import type { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
-import { requireRole, unauthorizedResponse } from '@/lib/auth';
+import { requirePermission } from '@/lib/permissions';
 
 export async function GET(request: Request) {
-  if (!(await requireRole('admin'))) return unauthorizedResponse();
+  const auth = await requirePermission('audit:read');
+  if (!auth.ok) return auth.response;
 
   const { searchParams } = new URL(request.url);
   const page = parseInt(searchParams.get('page') || '1', 10);
