@@ -42,6 +42,25 @@ function validPath(path: unknown): string | null {
   return path.slice(0, 512);
 }
 
+function trackingResponse(
+  body: Record<string, unknown>,
+  visitorId: string,
+  sessionId: string
+) {
+  const response = NextResponse.json(body);
+  response.cookies.set('visitor_id', visitorId, {
+    path: '/',
+    maxAge: 60 * 60 * 24 * 365,
+    sameSite: 'lax',
+  });
+  response.cookies.set('analytics_session_id', sessionId, {
+    path: '/',
+    maxAge: 60 * 30,
+    sameSite: 'lax',
+  });
+  return response;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({})) as {
@@ -49,6 +68,7 @@ export async function POST(req: NextRequest) {
       postId?: string;
       path?: string;
       sessionId?: string;
+      viewId?: string;
       duration?: number;
     };
     const { event } = body;
@@ -73,19 +93,9 @@ export async function POST(req: NextRequest) {
       sessionId = crypto.randomUUID();
     }
 
-    const response = NextResponse.json({ success: true, sessionId });
-    response.cookies.set('visitor_id', visitorId, {
-      path: '/',
-      maxAge: 60 * 60 * 24 * 365,
-      sameSite: 'lax',
-    });
-    response.cookies.set('analytics_session_id', sessionId, {
-      path: '/',
-      maxAge: 60 * 30,
-      sameSite: 'lax',
-    });
+    const response = () => trackingResponse({ success: true, sessionId }, visitorId, sessionId);
 
-    if (event === 'page_view') {
+    if (event === 'page_view' || event === 'page_duration') {
       const slugOrId = typeof body.postId === 'string' ? body.postId : null;
       const post = slugOrId
         ? await prisma.post.findFirst({
@@ -98,6 +108,44 @@ export async function POST(req: NextRequest) {
           })
         : null;
 
+      if (event === 'page_duration') {
+        if (duration > 0) {
+          await prisma.analyticsSession.update({
+            where: { id: sessionId },
+            data: {
+              exitPath: path,
+              duration: { increment: duration },
+              updatedAt: new Date(),
+            },
+          }).catch(() => {});
+
+          if (typeof body.viewId === 'string' && body.viewId) {
+            await prisma.postView.update({
+              where: { id: body.viewId },
+              data: { duration },
+            }).catch(() => {});
+          } else {
+            const latestView = await prisma.postView.findFirst({
+              where: {
+                sessionId,
+                path,
+                ...(post ? { postId: post.id } : {}),
+              },
+              orderBy: { createdAt: 'desc' },
+              select: { id: true },
+            });
+            if (latestView) {
+              await prisma.postView.update({
+                where: { id: latestView.id },
+                data: { duration },
+              }).catch(() => {});
+            }
+          }
+        }
+
+        return response();
+      }
+
       await prisma.analyticsSession.upsert({
         where: { id: sessionId },
         create: {
@@ -108,7 +156,7 @@ export async function POST(req: NextRequest) {
           referer,
           entryPath: path,
           exitPath: path,
-          duration,
+          duration: 0,
           pageViews: 1,
           device,
           browser,
@@ -123,7 +171,7 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      await prisma.postView.create({
+      const postView = await prisma.postView.create({
         data: {
           postId: post?.id,
           sessionId,
@@ -131,8 +179,9 @@ export async function POST(req: NextRequest) {
           userAgent: anonymize(ua),
           referer,
           path,
-          duration,
+          duration: 0,
         },
+        select: { id: true },
       });
 
       if (post) {
@@ -142,10 +191,10 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      return response;
+      return trackingResponse({ success: true, sessionId, viewId: postView.id }, visitorId, sessionId);
     }
 
-    return response;
+    return response();
   } catch (error) {
     console.error('Analytics track error:', error);
     return NextResponse.json({ success: false, error: 'Internal error' }, { status: 500 });

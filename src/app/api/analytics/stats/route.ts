@@ -5,6 +5,7 @@ import { requireAuth } from '@/lib/auth';
 export const dynamic = 'force-dynamic';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const ANALYTICS_TIME_ZONE = process.env.ANALYTICS_TIME_ZONE || 'Asia/Shanghai';
 
 function startOfDay(date: Date) {
   const d = new Date(date);
@@ -18,11 +19,69 @@ function parseDays(url: string) {
   return 7;
 }
 
+function formatDateKey(date: Date) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: ANALYTICS_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+
+  const year = parts.find((part) => part.type === 'year')?.value;
+  const month = parts.find((part) => part.type === 'month')?.value;
+  const day = parts.find((part) => part.type === 'day')?.value;
+  return `${year}-${month}-${day}`;
+}
+
 function groupRows(rows: { name: string | null; count: number }[]) {
   return rows.map((row) => ({
     name: row.name || 'unknown',
     count: row.count,
   }));
+}
+
+function getHost(value: string | undefined | null) {
+  if (!value) return null;
+  try {
+    return new URL(value).hostname.replace(/^www\./, '').toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function getInternalHosts(req: Request) {
+  const hosts = new Set<string>();
+  const requestHost = getHost(req.url);
+  const publicUrlHost = getHost(process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_URL);
+
+  if (requestHost) hosts.add(requestHost);
+  if (publicUrlHost) hosts.add(publicUrlHost);
+
+  return hosts;
+}
+
+function normalizeSourceHost(host: string) {
+  if (host.endsWith('google.com')) return 'google';
+  if (host.endsWith('baidu.com')) return 'baidu';
+  if (host.endsWith('bing.com')) return 'bing';
+  if (host.endsWith('github.com')) return 'github';
+  if (host.endsWith('zhihu.com')) return 'zhihu';
+  if (host.endsWith('x.com') || host.endsWith('twitter.com')) return 'x';
+  if (host.endsWith('weibo.com')) return 'weibo';
+  if (host.endsWith('juejin.cn')) return 'juejin';
+  return host;
+}
+
+function classifyReferer(referer: string | null, internalHosts: Set<string>) {
+  const host = getHost(referer);
+  if (!host) return 'direct';
+  if (internalHosts.has(host)) return 'internal';
+  return normalizeSourceHost(host);
+}
+
+function percentChange(current: number, previous: number) {
+  if (previous === 0) return current > 0 ? 100 : 0;
+  return Math.round(((current - previous) / previous) * 100);
 }
 
 export async function GET(req: Request) {
@@ -34,16 +93,21 @@ export async function GET(req: Request) {
   try {
     const days = parseDays(req.url);
     const since = startOfDay(new Date(Date.now() - (days - 1) * DAY_MS));
+    const previousSince = startOfDay(new Date(since.getTime() - days * DAY_MS));
+    const internalHosts = getInternalHosts(req);
 
     const [
       totalViews,
       totalSessions,
       sessionStats,
-      dailyViews,
-      topPosts,
+      previousViews,
+      previousSessions,
+      previousSessionStats,
+      dailyViewRows,
+      topPostViews,
       devices,
       browsers,
-      referers,
+      refererRows,
     ] = await Promise.all([
       prisma.postView.count({ where: { createdAt: { gte: since } } }),
       prisma.analyticsSession.count({ where: { createdAt: { gte: since } } }),
@@ -51,15 +115,41 @@ export async function GET(req: Request) {
         where: { createdAt: { gte: since } },
         _avg: { duration: true, pageViews: true },
       }),
-      prisma.postView.groupBy({
-        by: ['createdAt'],
-        where: { createdAt: { gte: since } },
-        _count: { _all: true },
+      prisma.postView.count({
+        where: {
+          createdAt: {
+            gte: previousSince,
+            lt: since,
+          },
+        },
       }),
-      prisma.post.findMany({
-        orderBy: { viewCount: 'desc' },
+      prisma.analyticsSession.count({
+        where: {
+          createdAt: {
+            gte: previousSince,
+            lt: since,
+          },
+        },
+      }),
+      prisma.analyticsSession.aggregate({
+        where: {
+          createdAt: {
+            gte: previousSince,
+            lt: since,
+          },
+        },
+        _avg: { duration: true, pageViews: true },
+      }),
+      prisma.postView.findMany({
+        where: { createdAt: { gte: since } },
+        select: { createdAt: true },
+      }),
+      prisma.postView.groupBy({
+        by: ['postId'],
+        where: { createdAt: { gte: since }, postId: { not: null } },
+        _count: { _all: true },
+        orderBy: { _count: { postId: 'desc' } },
         take: 10,
-        select: { id: true, title: true, viewCount: true },
       }),
       prisma.analyticsSession.groupBy({
         by: ['device'],
@@ -75,24 +165,30 @@ export async function GET(req: Request) {
         orderBy: { _count: { browser: 'desc' } },
         take: 6,
       }),
-      prisma.analyticsSession.groupBy({
-        by: ['referer'],
-        where: { createdAt: { gte: since }, isBot: false, referer: { not: null } },
-        _count: { _all: true },
-        orderBy: { _count: { referer: 'desc' } },
-        take: 8,
+      prisma.postView.findMany({
+        where: { createdAt: { gte: since } },
+        select: { referer: true },
       }),
     ]);
 
     const buckets = new Map<string, number>();
     for (let i = 0; i < days; i++) {
       const date = startOfDay(new Date(since.getTime() + i * DAY_MS));
-      buckets.set(date.toISOString().slice(0, 10), 0);
+      buckets.set(formatDateKey(date), 0);
     }
-    for (const row of dailyViews) {
-      const key = startOfDay(row.createdAt).toISOString().slice(0, 10);
-      buckets.set(key, (buckets.get(key) || 0) + row._count._all);
+    for (const row of dailyViewRows) {
+      const key = formatDateKey(row.createdAt);
+      buckets.set(key, (buckets.get(key) || 0) + 1);
     }
+
+    const topPostIds = topPostViews
+      .map((row) => row.postId)
+      .filter((postId): postId is string => Boolean(postId));
+    const topPostRecords = await prisma.post.findMany({
+      where: { id: { in: topPostIds } },
+      select: { id: true, slug: true, title: true },
+    });
+    const topPostById = new Map(topPostRecords.map((post) => [post.id, post]));
 
     const deviceRows = groupRows(devices.map((row) => ({
       name: row.device,
@@ -102,13 +198,20 @@ export async function GET(req: Request) {
       name: row.browser,
       count: row._count?._all || 0,
     })));
-    const refererRows = groupRows(referers.map((row) => ({
-      name: row.referer,
-      count: row._count?._all || 0,
-    }))).map((row) => ({
-      ...row,
-      name: row.name.replace(/^https?:\/\//, '').split('/')[0] || 'direct',
-    }));
+    const sourceCounts = new Map<string, number>();
+    let internalReferrals = 0;
+    for (const row of refererRows) {
+      const source = classifyReferer(row.referer, internalHosts);
+      if (source === 'internal') {
+        internalReferrals += 1;
+        continue;
+      }
+      sourceCounts.set(source, (sourceCounts.get(source) || 0) + 1);
+    }
+    const sourceRows = Array.from(sourceCounts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
 
     return NextResponse.json({
       period: { days },
@@ -118,11 +221,32 @@ export async function GET(req: Request) {
         avgDuration: Math.round(sessionStats._avg.duration || 0),
         avgPageViews: Number((sessionStats._avg.pageViews || 0).toFixed(1)),
       },
+      changes: {
+        totalViews: percentChange(totalViews, previousViews),
+        totalSessions: percentChange(totalSessions, previousSessions),
+        avgDuration: percentChange(
+          Math.round(sessionStats._avg.duration || 0),
+          Math.round(previousSessionStats._avg.duration || 0)
+        ),
+        avgPageViews: percentChange(
+          Number((sessionStats._avg.pageViews || 0).toFixed(1)),
+          Number((previousSessionStats._avg.pageViews || 0).toFixed(1))
+        ),
+      },
       trend: Array.from(buckets.entries()).map(([date, count]) => ({ date, count })),
-      topPosts: topPosts.map((post) => ({ postId: post.id, title: post.title, views: post.viewCount })),
+      topPosts: topPostViews.map((row) => {
+        const post = row.postId ? topPostById.get(row.postId) : null;
+        return {
+          postId: row.postId,
+          slug: post?.slug || null,
+          title: post?.title || '已删除文章',
+          views: row._count._all,
+        };
+      }),
       devices: deviceRows,
       browsers: browserRows,
-      referers: refererRows,
+      referers: sourceRows,
+      internalReferrals,
     });
   } catch (error) {
     console.error('Analytics stats error:', error);
