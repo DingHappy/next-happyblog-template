@@ -9,6 +9,7 @@ import {
   ensureDefaultUser,
 } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { getClientIp, rateLimit } from '@/lib/rate-limit';
 
 export async function POST(request: Request) {
   try {
@@ -18,6 +19,20 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: '请输入密码' },
         { status: 400 }
+      );
+    }
+
+    // 登录限流：同 IP + 用户名 15 分钟最多 10 次尝试，防爆破
+    const ip = getClientIp(request) ?? 'unknown';
+    const limitKey = `login:${ip}:${username ?? '_legacy'}`;
+    const limited = rateLimit({ key: limitKey, limit: 10, windowMs: 15 * 60 * 1000 });
+    if (!limited.ok) {
+      return NextResponse.json(
+        { error: '登录尝试过于频繁，请稍后再试' },
+        {
+          status: 429,
+          headers: { 'Retry-After': String(Math.ceil(limited.retryAfterMs / 1000)) },
+        },
       );
     }
 

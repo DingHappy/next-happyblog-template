@@ -3,6 +3,8 @@ import { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { requireAuth } from '@/lib/auth';
 
+const RESULT_LIMIT = 20;
+
 function tokenize(query: string) {
   return query
     .trim()
@@ -31,61 +33,104 @@ function buildSnippet(content: string, keywords: string[], fallback: string) {
   return `${start > 0 ? '...' : ''}${normalized.slice(start, end)}${end < normalized.length ? '...' : ''}`;
 }
 
+// Use pg_trgm similarity + ILIKE (both index-backed by GIN trigram).
+// Returns ranked post IDs with a similarity score. Throws if pg_trgm
+// is missing — caller handles fallback.
+async function searchPostIdsWithTrigram(
+  query: string,
+  isAdmin: boolean,
+  categoryId: string | null,
+): Promise<{ id: string; similarity: number }[]> {
+  const visibilityClause = isAdmin
+    ? Prisma.empty
+    : Prisma.sql`AND "isPublic" = true`;
+  const categoryClause = categoryId
+    ? Prisma.sql`AND "categoryId" = ${categoryId}`
+    : Prisma.empty;
+
+  return prisma.$queryRaw<{ id: string; similarity: number }[]>`
+    SELECT id,
+      GREATEST(
+        similarity(title, ${query}) * 3,
+        similarity(COALESCE(excerpt, ''), ${query}) * 1.5,
+        similarity(COALESCE(content, ''), ${query})
+      )::float AS similarity
+    FROM "Post"
+    WHERE published = true
+      ${visibilityClause}
+      ${categoryClause}
+      AND (
+        title ILIKE '%' || ${query} || '%'
+        OR excerpt ILIKE '%' || ${query} || '%'
+        OR content ILIKE '%' || ${query} || '%'
+        OR title % ${query}
+      )
+    ORDER BY similarity DESC, "createdAt" DESC
+    LIMIT ${RESULT_LIMIT}
+  `;
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const query = searchParams.get('q');
+  const rawQuery = searchParams.get('q');
   const category = searchParams.get('category');
   const isAdmin = await requireAuth();
 
-  if (!query || query.trim().length === 0) {
+  if (!rawQuery || rawQuery.trim().length === 0) {
     return NextResponse.json({ results: [], total: 0 });
   }
 
-  try {
-    const keywords = tokenize(query);
-    const whereClause: Prisma.PostWhereInput = {
-      published: true,
-      ...(isAdmin ? {} : { isPublic: true }),
-      OR: [
-        { title: { contains: query.trim(), mode: 'insensitive' } },
-        { excerpt: { contains: query.trim(), mode: 'insensitive' } },
-        { content: { contains: query.trim(), mode: 'insensitive' } },
-        { tags: { some: { name: { contains: query.trim(), mode: 'insensitive' } } } },
-        { category: { name: { contains: query.trim(), mode: 'insensitive' } } },
-      ],
-    };
+  const query = rawQuery.trim();
+  const keywords = tokenize(query);
 
-    if (category) {
-      whereClause.categoryId = category;
+  try {
+    let candidateIds: { id: string; similarity: number }[] = [];
+    let usedTrigram = true;
+
+    try {
+      candidateIds = await searchPostIdsWithTrigram(query, isAdmin, category);
+    } catch (err) {
+      // pg_trgm not installed (extension missing) or similar — fall back
+      // to a Prisma-only OR-contains query so search still works pre-migration.
+      usedTrigram = false;
+      console.warn('[search] trigram path unavailable, falling back', err);
     }
 
-    const results = await prisma.post.findMany({
-      where: whereClause,
-      select: {
-        id: true,
-        slug: true,
-        title: true,
-        excerpt: true,
-        content: true,
-        category: true,
-        tags: true,
-        coverImage: true,
-        createdAt: true,
-        _count: {
-          select: { comments: true },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take: 20,
-    });
+    let posts: LoadedPost[] = [];
+    let total = 0;
 
-    const total = await prisma.post.count({ where: whereClause });
-    const rankedResults = results
+    if (usedTrigram) {
+      const ids = candidateIds.map((row) => row.id);
+      total = await prisma.post.count({
+        where: buildFallbackWhere(query, isAdmin, category),
+      });
+      posts = ids.length
+        ? await prisma.post.findMany({
+            where: { id: { in: ids } },
+            select: postSelect,
+          })
+        : [];
+      // Restore similarity ordering returned by SQL.
+      const rank = new Map(ids.map((id, idx) => [id, idx]));
+      posts.sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
+    } else {
+      const where = buildFallbackWhere(query, isAdmin, category);
+      [posts, total] = await Promise.all([
+        prisma.post.findMany({
+          where,
+          select: postSelect,
+          orderBy: { createdAt: 'desc' },
+          take: RESULT_LIMIT,
+        }),
+        prisma.post.count({ where }),
+      ]);
+    }
+
+    const similarityById = new Map(candidateIds.map((row) => [row.id, row.similarity]));
+    const rankedResults = posts
       .map((post) => {
         const matchedFields = new Set<string>();
-        let score = 0;
+        let score = (similarityById.get(post.id) ?? 0) * 10;
 
         for (const keyword of keywords) {
           if (includesText(post.title, keyword)) {
@@ -122,12 +167,12 @@ export async function GET(request: Request) {
 
     const [suggestedCategories, suggestedTags] = await Promise.all([
       prisma.category.findMany({
-        where: { name: { contains: query.trim(), mode: 'insensitive' } },
+        where: { name: { contains: query, mode: 'insensitive' } },
         select: { id: true, name: true, slug: true },
         take: 5,
       }),
       prisma.tag.findMany({
-        where: { name: { contains: query.trim(), mode: 'insensitive' } },
+        where: { name: { contains: query, mode: 'insensitive' } },
         select: { id: true, name: true, slug: true },
         take: 8,
       }),
@@ -136,6 +181,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       results: rankedResults,
       total,
+      engine: usedTrigram ? 'trigram' : 'ilike',
       suggestions: {
         categories: suggestedCategories,
         tags: suggestedTags,
@@ -148,4 +194,39 @@ export async function GET(request: Request) {
       { status: 500 }
     );
   }
+}
+
+const postSelect = {
+  id: true,
+  slug: true,
+  title: true,
+  excerpt: true,
+  content: true,
+  category: true,
+  tags: true,
+  coverImage: true,
+  createdAt: true,
+  _count: { select: { comments: true } },
+} satisfies Prisma.PostSelect;
+
+type LoadedPost = Prisma.PostGetPayload<{ select: typeof postSelect }>;
+
+function buildFallbackWhere(
+  query: string,
+  isAdmin: boolean,
+  category: string | null,
+): Prisma.PostWhereInput {
+  const where: Prisma.PostWhereInput = {
+    published: true,
+    ...(isAdmin ? {} : { isPublic: true }),
+    OR: [
+      { title: { contains: query, mode: 'insensitive' } },
+      { excerpt: { contains: query, mode: 'insensitive' } },
+      { content: { contains: query, mode: 'insensitive' } },
+      { tags: { some: { name: { contains: query, mode: 'insensitive' } } } },
+      { category: { name: { contains: query, mode: 'insensitive' } } },
+    ],
+  };
+  if (category) where.categoryId = category;
+  return where;
 }

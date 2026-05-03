@@ -2,41 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { sendNewCommentNotification, sendReplyNotification } from '@/lib/email';
 import { moderateComment } from '@/lib/comment-moderation';
-
-// 频率限制：同一个 IP 1 分钟内最多 3 条
-const RATE_LIMIT_MS = 60 * 1000;
-const RATE_LIMIT_MAX = 3;
-
-// 内存级 dedup，挂在 globalThis 上以扛 HMR；多实例部署需要换 Redis
-const globalForRate = globalThis as unknown as {
-  __commentRate?: Map<string, number[]>;
-};
-const recentByIp: Map<string, number[]> =
-  globalForRate.__commentRate ?? (globalForRate.__commentRate = new Map());
-
-function isRateLimited(ip: string | null): boolean {
-  if (!ip) return false;
-  const now = Date.now();
-  const recent = (recentByIp.get(ip) ?? []).filter(
-    (t) => now - t < RATE_LIMIT_MS
-  );
-  if (recent.length >= RATE_LIMIT_MAX) {
-    recentByIp.set(ip, recent);
-    return true;
-  }
-  recent.push(now);
-  recentByIp.set(ip, recent);
-  return false;
-}
-
-function getClientIp(request: Request): string | null {
-  return (
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    request.headers.get('x-real-ip') ||
-    request.headers.get('cf-connecting-ip') ||
-    null
-  );
-}
+import { getClientIp, rateLimit } from '@/lib/rate-limit';
 
 // 获取评论（包含嵌套回复）
 export async function GET(request: Request) {
@@ -103,12 +69,22 @@ export async function POST(request: Request) {
 
     const ip = getClientIp(request);
 
-    // 速率限制：硬拒绝
-    if (isRateLimited(ip)) {
-      return NextResponse.json(
-        { error: '评论过于频繁，请稍后再试' },
-        { status: 429 }
-      );
+    // 速率限制：同 IP 1 分钟最多 3 条
+    if (ip) {
+      const result = rateLimit({
+        key: `comments:${ip}`,
+        limit: 3,
+        windowMs: 60 * 1000,
+      });
+      if (!result.ok) {
+        return NextResponse.json(
+          { error: '评论过于频繁，请稍后再试' },
+          {
+            status: 429,
+            headers: { 'Retry-After': String(Math.ceil(result.retryAfterMs / 1000)) },
+          },
+        );
+      }
     }
 
     const moderation = moderateComment({ author, email: email ?? null, content });

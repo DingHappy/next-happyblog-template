@@ -1,3 +1,4 @@
+import { Link } from '@/i18n/navigation';
 import { siteConfig } from '@/config/site';
 
 export default function Footer() {
@@ -6,9 +7,9 @@ export default function Footer() {
       <div className="max-w-[1400px] mx-auto py-8 flex flex-col md:flex-row items-center justify-center md:justify-between gap-4 px-4">
         <span className="text-sm font-medium">
           © {new Date().getFullYear()}&nbsp;
-          <a className="hover:underline font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent" href="/about">
+          <Link className="hover:underline font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent" href="/about">
             {siteConfig.logoEmoji} {siteConfig.name}
-          </a>
+          </Link>
           &nbsp; Made with care
         </span>
         <span className="text-sm font-medium">

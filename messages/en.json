@@ -1,0 +1,55 @@
+{
+  "nav": {
+    "home": "Home",
+    "archives": "Archives",
+    "about": "About"
+  },
+  "common": {
+    "search": "Search",
+    "loading": "Loading…",
+    "readMore": "Read more",
+    "minutesRead": "{minutes} min read"
+  },
+  "about": {
+    "techStackTitle": "Tech stack",
+    "interestsTitle": "Use cases",
+    "contactTitle": "Get in touch",
+    "contactBlurb": "Configure social links in your private production repo and they will appear here automatically.",
+    "contactPlaceholder": "Configure NEXT_PUBLIC_SOCIAL_* to enable links"
+  },
+  "comments": {
+    "submit": "Post comment",
+    "placeholder": "Write a comment…",
+    "tooFrequent": "Too many comments — please slow down."
+  },
+  "home": {
+    "allPosts": "📋 All posts",
+    "noPosts": "No posts yet",
+    "noTags": "No tags yet",
+    "noArchives": "No archives yet",
+    "noComments": "No comments yet",
+    "minRead": "{minutes} min read",
+    "pinned": "📌 Pinned",
+    "private": "🔒 Private",
+    "readMore": "Read more →",
+    "commentedOn": "{author} commented",
+    "databaseUnavailable": "Database is temporarily unavailable. Make sure PostgreSQL is running and DATABASE_URL in .env points to the right environment.",
+    "adminTitle": "Admin",
+    "adminSubtitle": "Manage posts and content",
+    "previous": "← Previous",
+    "next": "Next →",
+    "stats": {
+      "posts": "Posts",
+      "categories": "Categories",
+      "tags": "Tags"
+    },
+    "sections": {
+      "categories": "Categories",
+      "tags": "Tags",
+      "archives": "Archives",
+      "recentArticles": "Recent Articles",
+      "recentComments": "Recent Comments",
+      "friends": "Friends"
+    }
+  }
+}

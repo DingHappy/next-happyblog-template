@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale } from "next-intl/server";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -49,28 +51,31 @@ const themeScript = `
 })();
 `;
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getLocale();
   return (
     <html
-      lang={siteConfig.language}
+      lang={locale}
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col bg-gray-50 dark:bg-slate-950 text-gray-800 dark:text-slate-100">
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
-        <FeedbackProvider>
-          <AnalyticsProvider>
-            <Navbar />
-            <main className="flex-1 pb-20 lg:pb-0">{children}</main>
-            <Footer />
-            <BackToTop />
-            <MobileBottomNav />
-          </AnalyticsProvider>
-        </FeedbackProvider>
+        <NextIntlClientProvider>
+          <FeedbackProvider>
+            <AnalyticsProvider>
+              <Navbar />
+              <main className="flex-1 pb-20 lg:pb-0">{children}</main>
+              <Footer />
+              <BackToTop />
+              <MobileBottomNav />
+            </AnalyticsProvider>
+          </FeedbackProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

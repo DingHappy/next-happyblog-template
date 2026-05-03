@@ -4,7 +4,32 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import ThemeToggle from './ThemeToggle';
+import LocaleSwitcher from './LocaleSwitcher';
+import { getPathnameLocale, localizePathname, normalizeLocalePathname } from '@/i18n/pathname';
+import { routing } from '@/i18n/routing';
 import { siteConfig } from '@/config/site';
+
+// `i18n: true` routes auto-prefix with the active locale (must exist under
+// src/app/[locale]/...). `i18n: false` routes link to the legacy non-prefixed
+// path; useful while we migrate one page at a time.
+const NAV_LINKS = [
+  { href: '/', key: 'home', i18n: true },
+  { href: '/archives', key: 'archives', i18n: false },
+  { href: '/about', key: 'about', i18n: true },
+] as const;
+
+const NAV_LABELS = {
+  zh: {
+    home: '首页',
+    archives: '归档',
+    about: '关于',
+  },
+  en: {
+    home: 'Home',
+    archives: 'Archives',
+    about: 'About',
+  },
+} as const;
 
 type SearchResult = {
   id: string;
@@ -18,6 +43,9 @@ type SearchResult = {
 
 export default function Navbar() {
   const pathname = usePathname();
+  const locale = getPathnameLocale(pathname) ?? routing.defaultLocale;
+  const normalizedPathname = normalizeLocalePathname(pathname);
+  const navLabels = NAV_LABELS[locale];
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -36,7 +64,7 @@ export default function Navbar() {
       setIsSearchOpen(false);
       setIsMenuOpen(false);
     }
-  }, []);
+  }, [setIsMenuOpen, setIsSearchOpen]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
@@ -120,20 +148,27 @@ export default function Navbar() {
 
             {/* 导航链接 */}
             <nav className="p-4 flex flex-col gap-2">
-              {siteConfig.nav.map(link => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  onClick={() => setIsMenuOpen(false)}
-                  className={`inline-flex items-center h-12 px-4 rounded-xl text-sm font-bold transition-all duration-300 ${
-                    pathname === link.href
-                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg shadow-purple-500/25'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 dark:hover:from-slate-800 dark:hover:to-slate-700 hover:text-purple-600 dark:hover:text-purple-300'
-                  }`}
-                >
-                  {link.label}
-                </Link>
-              ))}
+              {NAV_LINKS.map(link => {
+                const href = link.i18n ? localizePathname(link.href, locale) : link.href;
+                const isActive = link.i18n
+                  ? normalizedPathname === link.href
+                  : pathname === link.href || pathname.startsWith(`${link.href}/`);
+                const className = `inline-flex items-center h-12 px-4 rounded-xl text-sm font-bold transition-all duration-300 ${
+                  isActive
+                    ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg shadow-purple-500/25'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 dark:hover:from-slate-800 dark:hover:to-slate-700 hover:text-purple-600 dark:hover:text-purple-300'
+                }`;
+                const onClick = () => setIsMenuOpen(false);
+                return link.i18n ? (
+                  <Link key={link.href} href={href} onClick={onClick} className={className}>
+                    {navLabels[link.key]}
+                  </Link>
+                ) : (
+                  <Link key={link.href} href={href} onClick={onClick} className={className}>
+                    {navLabels[link.key]}
+                  </Link>
+                );
+              })}
             </nav>
 
             {/* 菜单底部 */}
@@ -255,7 +290,7 @@ export default function Navbar() {
       <header className="w-full h-auto sticky top-0 z-40 border-b border-gray-100 bg-white-opacity-80 backdrop-blur-xl overflow-x-hidden shadow-sm">
         <div className="w-full h-full py-2 max-w-[1400px] mx-auto">
           <div className="flex flex-row items-center justify-between gap-2 lg:gap-4 xl:gap-6 px-4 py-1">
-            <Link href="/" className="flex flex-row items-center gap-2 shrink-0 group">
+            <Link href={localizePathname('/', locale)} className="flex flex-row items-center gap-2 shrink-0 group">
               <span className="text-2xl group-hover:scale-110 transition-transform">{siteConfig.logoEmoji}</span>
               <span className="font-bold text-lg bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
                 {siteConfig.name}
@@ -265,22 +300,26 @@ export default function Navbar() {
             {/* Desktop nav */}
             <div className="hidden lg:flex lg:flex-row items-center justify-between flex-grow gap-2">
               <nav className="flex flex-1 items-center justify-center gap-1">
-                {siteConfig.nav.map(link => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className={`inline-flex h-10 items-center justify-center rounded-xl px-4 py-2 text-sm font-bold transition-all duration-300 ${
-                      pathname === link.href
-                        ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg shadow-purple-500/25'
-                        : 'text-gray-600 dark:text-gray-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 dark:hover:from-slate-800 dark:hover:to-slate-700 hover:text-purple-600 dark:hover:text-purple-300'
-                    }`}
-                  >
-                    {link.label}
-                  </Link>
-                ))}
+                {NAV_LINKS.map(link => {
+                  const href = link.i18n ? localizePathname(link.href, locale) : link.href;
+                  const isActive = link.i18n
+                    ? normalizedPathname === link.href
+                    : pathname === link.href || pathname.startsWith(`${link.href}/`);
+                  const className = `inline-flex h-10 items-center justify-center rounded-xl px-4 py-2 text-sm font-bold transition-all duration-300 ${
+                    isActive
+                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg shadow-purple-500/25'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 dark:hover:from-slate-800 dark:hover:to-slate-700 hover:text-purple-600 dark:hover:text-purple-300'
+                  }`;
+                  return link.i18n ? (
+                    <Link key={link.href} href={href} className={className}>{navLabels[link.key]}</Link>
+                  ) : (
+                    <Link key={link.href} href={href} className={className}>{navLabels[link.key]}</Link>
+                  );
+                })}
               </nav>
 
               <div className="flex flex-row gap-2 items-center">
+                <LocaleSwitcher />
                 {/* 主题切换 */}
                 <ThemeToggle />
                 
