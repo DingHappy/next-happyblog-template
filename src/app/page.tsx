@@ -23,6 +23,41 @@ type CategoryTree = CategoryWithCount & {
   children: CategoryTree[];
 };
 
+type HomePost = Prisma.PostGetPayload<{
+  include: {
+    category: true;
+    tags: true;
+    _count: {
+      select: {
+        comments: true;
+      };
+    };
+  };
+}>;
+
+type HomeTag = Prisma.TagGetPayload<{
+  include: {
+    _count: {
+      select: {
+        posts: true;
+      };
+    };
+  };
+}>;
+
+type ArchivePost = Pick<Prisma.PostGetPayload<Record<string, never>>, 'createdAt'>;
+
+type RecentComment = Prisma.CommentGetPayload<{
+  include: {
+    post: {
+      select: {
+        title: true;
+        id: true;
+      };
+    };
+  };
+}>;
+
 async function buildCategoryTree(parentId: string | null = null, isAdmin: boolean = false): Promise<CategoryTree[]> {
   const categories = await prisma.category.findMany({
     where: { parentId },
@@ -81,17 +116,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
   const currentPage = Math.max(1, parseInt(page || '1', 10));
   const pageSize = 10;
   
-  // 检查管理员登录状态
-  const isAdmin = await requireAuth();
-  
-  // 检查并自动发布定时文章
-  await prisma.post.updateMany({
-    where: {
-      published: false,
-      scheduledAt: { lte: new Date() },
-    },
-    data: { published: true },
-  });
+  const isAdmin = await requireAuth().catch(() => false);
   
   // 从数据库读取文章 - 管理员可以看到不公开的文章
   const whereClause: Prisma.PostWhereInput = { 
@@ -107,59 +132,74 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
     };
   }
   
-  const [posts, categories, totalPosts, filteredPostCount, tags, archivePosts, recentComments, friendLinks] = await Promise.all([
-    prisma.post.findMany({
-      where: whereClause,
-      include: {
-        category: true,
-        tags: true,
-        _count: {
-          select: { comments: true },
-        },
-      },
-      orderBy: [
-        { isPinned: 'desc' }, // 置顶文章排最前
-        { createdAt: 'desc' },
-      ],
-      skip: (currentPage - 1) * pageSize,
-      take: pageSize,
-    }),
-    buildCategoryTree(null, isAdmin),
-    prisma.post.count({ where: isAdmin ? { published: true } : { published: true, isPublic: true } }),
-    prisma.post.count({ where: whereClause }),
-    prisma.tag.findMany({
-      include: {
-        _count: {
-          select: {
-             posts: {
-               where: isAdmin ? { published: true } : { published: true, isPublic: true },
-             },
+  let databaseUnavailable = false;
+  let posts: HomePost[] = [];
+  let categories: CategoryTree[] = [];
+  let totalPosts = 0;
+  let filteredPostCount = 0;
+  let tags: HomeTag[] = [];
+  let archivePosts: ArchivePost[] = [];
+  let recentComments: RecentComment[] = [];
+  let friendLinks: Prisma.FriendLinkGetPayload<Record<string, never>>[] = [];
+
+  try {
+    [posts, categories, totalPosts, filteredPostCount, tags, archivePosts, recentComments, friendLinks] = await Promise.all([
+      prisma.post.findMany({
+        where: whereClause,
+        include: {
+          category: true,
+          tags: true,
+          _count: {
+            select: { comments: true },
           },
         },
-      },
-      orderBy: {
-        name: 'asc',
-      },
-    }),
-    prisma.post.findMany({
-      where: isAdmin ? { published: true } : { published: true, isPublic: true },
-      select: { createdAt: true },
-      orderBy: { createdAt: 'desc' },
-    }),
-     prisma.comment.findMany({
-       take: 5,
-       orderBy: { createdAt: 'desc' },
-       include: {
-         post: {
-           select: { title: true, id: true },
+        orderBy: [
+          { isPinned: 'desc' },
+          { createdAt: 'desc' },
+        ],
+        skip: (currentPage - 1) * pageSize,
+        take: pageSize,
+      }),
+      buildCategoryTree(null, isAdmin),
+      prisma.post.count({ where: isAdmin ? { published: true } : { published: true, isPublic: true } }),
+      prisma.post.count({ where: whereClause }),
+      prisma.tag.findMany({
+        include: {
+          _count: {
+            select: {
+               posts: {
+                 where: isAdmin ? { published: true } : { published: true, isPublic: true },
+               },
+            },
+          },
+        },
+        orderBy: {
+          name: 'asc',
+        },
+      }),
+      prisma.post.findMany({
+        where: isAdmin ? { published: true } : { published: true, isPublic: true },
+        select: { createdAt: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+       prisma.comment.findMany({
+         take: 5,
+         orderBy: { createdAt: 'desc' },
+         include: {
+           post: {
+             select: { title: true, id: true },
+           },
          },
-       },
-     }),
-     prisma.friendLink.findMany({
-       where: { isVisible: true },
-       orderBy: { order: 'asc' },
-     }),
-   ]);
+       }),
+       prisma.friendLink.findMany({
+         where: { isVisible: true },
+         orderBy: { order: 'asc' },
+       }),
+     ]);
+  } catch (error) {
+    databaseUnavailable = true;
+    console.error('Home data load failed:', error);
+  }
    
    const visibleTags = tags.filter(tag => tag._count.posts > 0);
   const totalTags = visibleTags.length;
@@ -323,8 +363,17 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
 
         {/* 中间文章列表 */}
         <div className="w-full flex flex-col items-center gap-8">
+          {databaseUnavailable && (
+            <div className="w-full rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+              数据库暂时不可用。请检查 PostgreSQL 是否启动，以及 `.env` 中的 `DATABASE_URL` 是否指向当前运行环境。
+            </div>
+          )}
           <div className="w-full flex flex-col gap-4">
-            {posts.map((post, index) => {
+            {posts.length === 0 && !databaseUnavailable ? (
+              <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-16 text-center text-gray-500 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-400">
+                暂无文章
+              </div>
+            ) : posts.map((post, index) => {
               const postHref = `/posts/${post.slug || post.id}`;
               return (
               <Link 

@@ -72,11 +72,18 @@ export default function AdminBackup() {
       e.target.value = '';
       return;
     }
+    const confirmation = prompt('请输入 RESTORE 确认恢复操作。系统会先自动备份当前数据。');
+    if (confirmation?.trim().toUpperCase() !== 'RESTORE') {
+      toast('恢复已取消', 'info');
+      e.target.value = '';
+      return;
+    }
 
     setRestoring(true);
     try {
       const formData = new FormData();
       formData.append('file', file);
+      formData.append('confirmation', confirmation);
 
       const res = await fetch('/api/admin/backup', {
         method: 'POST',
@@ -84,7 +91,9 @@ export default function AdminBackup() {
       });
 
       if (res.ok) {
-        toast('数据恢复成功', 'success');
+        const data = await res.json();
+        toast(`数据恢复成功，恢复前备份：${data.preRestoreBackup || '已创建'}`, 'success');
+        loadBackups();
       } else {
         const data = await res.json();
         toast(data.error || '恢复失败', 'error');
@@ -102,14 +111,20 @@ export default function AdminBackup() {
     if (!confirm(`警告：确定要从备份 ${filename} 恢复吗？这将覆盖所有现有数据！`)) {
       return;
     }
+    const confirmation = prompt('请输入 RESTORE 确认恢复操作。系统会先自动备份当前数据。');
+    if (confirmation?.trim().toUpperCase() !== 'RESTORE') {
+      toast('恢复已取消', 'info');
+      return;
+    }
 
     setRestoring(true);
     try {
-      const res = await fetch(`/api/admin/backup?filename=${encodeURIComponent(filename)}`, { 
+      const res = await fetch(`/api/admin/backup?filename=${encodeURIComponent(filename)}&confirmation=${encodeURIComponent(confirmation)}`, { 
         method: 'DELETE' 
       });
       if (res.ok) {
-        toast('数据恢复成功', 'success');
+        const data = await res.json();
+        toast(`数据恢复成功，恢复前备份：${data.preRestoreBackup || '已创建'}`, 'success');
         loadBackups();
       } else {
         const data = await res.json();
@@ -215,7 +230,7 @@ export default function AdminBackup() {
 
                 <div className="mt-6 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800">
                   <p className="text-sm text-amber-700 dark:text-amber-400">
-                    ⚠️ <strong>警告</strong>：恢复操作会覆盖所有现有数据，请确保已备份当前数据后再继续。
+                    ⚠️ <strong>警告</strong>：恢复操作会覆盖所有现有数据。系统会在恢复前自动创建一份 pre-restore 备份，并要求输入 RESTORE 二次确认。
                   </p>
                 </div>
               </div>

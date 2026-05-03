@@ -4,7 +4,7 @@ import { requireRole, hashPassword, unauthorizedResponse, type UserRole } from '
 import { withAuditLog } from '@/lib/audit';
 
 export async function GET() {
-  if (!(await requireRole('admin'))) return unauthorizedResponse();
+  if (!(await requireRole('superadmin'))) return unauthorizedResponse();
 
   const users = await prisma.user.findMany({
     select: {
@@ -25,7 +25,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!(await requireRole('admin'))) return unauthorizedResponse();
+  if (!(await requireRole('superadmin'))) return unauthorizedResponse();
 
   const body = await request.json();
   const { username, email, password, role, displayName, avatar, bio } = body;

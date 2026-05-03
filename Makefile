@@ -1,4 +1,4 @@
-.PHONY: help build up down restart logs backup restore psql clean prune init-db
+.PHONY: help build up down restart logs backup restore psql clean prune init-db deploy aliyun-deploy
 
 # 颜色定义
 GREEN  := $(shell tput -Txterm setaf 2)
@@ -57,6 +57,22 @@ aliyun-migrate: ## 运行阿里云部署数据库迁移
 aliyun-logs: ## 查看阿里云部署应用日志
 	docker compose -f docker-compose.aliyun.yml logs -f app
 
+aliyun-restart: ## 重启阿里云部署应用
+	docker compose -f docker-compose.aliyun.yml up -d app
+
+aliyun-health: ## 检查阿里云部署应用健康状态
+	curl -fsS http://127.0.0.1:$${APP_PORT:-3000}/api/health
+
+aliyun-deploy: ## 阿里云部署更新（构建 + 迁移 + 重启 + 健康检查）
+	@echo '${YELLOW}正在执行阿里云部署更新...${RESET}'
+	docker compose -f docker-compose.aliyun.yml build app migrate
+	docker compose -f docker-compose.aliyun.yml up -d postgres
+	docker compose -f docker-compose.aliyun.yml --profile tools run --rm migrate
+	docker compose -f docker-compose.aliyun.yml up -d app
+	curl -fsS http://127.0.0.1:$${APP_PORT:-3000}/api/health
+	@echo ''
+	@echo '${GREEN}✓ 阿里云部署更新完成${RESET}'
+
 install-backup-cron: ## 安装每日数据库备份 cron
 	./scripts/install-backup-cron.sh
 
@@ -85,6 +101,14 @@ stop: ## 停止服务（保留容器）
 restart: ## 重启服务
 	@echo '${YELLOW}正在重启服务...${RESET}'
 	docker-compose restart
+
+deploy: ## 本地 Docker 部署更新（构建 + 迁移 + 重启）
+	@echo '${YELLOW}正在执行本地 Docker 部署更新...${RESET}'
+	docker-compose build app migrate
+	docker-compose up -d postgres
+	docker compose --profile tools run --rm migrate
+	docker-compose up -d app
+	@echo '${GREEN}✓ 本地 Docker 部署更新完成${RESET}'
 
 # ============================================
 # 日志相关
@@ -166,6 +190,7 @@ update: ## 更新部署（拉取代码 + 构建 + 重启）
 health: ## 健康检查
 	@echo '${YELLOW}服务健康状态:${RESET}'
 	@docker-compose ps | grep -E "(NAME|app|postgres|nginx)"
+	@curl -fsS http://127.0.0.1:$${APP_PORT:-3000}/api/health || true
 
 watchtower: ## 启动自动更新（Watchtower）
 	@echo '${YELLOW}正在启动 Watchtower 自动更新...${RESET}'

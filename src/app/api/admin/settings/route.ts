@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getSettings, updateSettings } from '@/lib/settings';
-import { requireAuth, unauthorizedResponse } from '@/lib/auth';
+import { requireRole, unauthorizedResponse } from '@/lib/auth';
 import { createAuditLog } from '@/lib/audit';
 
 export async function GET() {
-  if (!await requireAuth()) {
+  if (!await requireRole('superadmin')) {
     return unauthorizedResponse();
   }
 
@@ -21,7 +21,7 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
-  if (!await requireAuth()) {
+  if (!await requireRole('superadmin')) {
     return unauthorizedResponse();
   }
 

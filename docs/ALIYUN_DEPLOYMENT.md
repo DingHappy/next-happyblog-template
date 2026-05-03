@@ -171,9 +171,7 @@ systemctl reload nginx
 ```bash
 cd /opt/my-blog-production
 git pull origin main
-docker compose -f docker-compose.aliyun.yml build
-docker compose -f docker-compose.aliyun.yml --profile tools run --rm migrate
-docker compose -f docker-compose.aliyun.yml up -d app
+make aliyun-deploy
 ```
 
 If you changed `ADMIN_PASSWORD` or need to reset the first admin account, run:
@@ -185,6 +183,16 @@ docker compose -f docker-compose.aliyun.yml --profile tools run --rm migrate npm
 Use `--no-cache` only when changing base image dependencies or debugging stale Docker layers.
 
 The Dockerfile keeps dependency installation and Prisma Client generation in a stable cache layer. Normal source-only updates should use `build` without `--no-cache`.
+
+Equivalent manual commands:
+
+```bash
+docker compose -f docker-compose.aliyun.yml build app migrate
+docker compose -f docker-compose.aliyun.yml up -d postgres
+docker compose -f docker-compose.aliyun.yml --profile tools run --rm migrate
+docker compose -f docker-compose.aliyun.yml up -d app
+curl -fsS http://127.0.0.1:3000/api/health
+```
 
 Optionally pass version metadata into the image:
 
@@ -204,6 +212,21 @@ Restore a backup:
 
 ```bash
 ./scripts/restore-db.sh backups/blog_db_YYYYMMDD_HHMMSS.dump
+```
+
+The admin JSON restore screen also creates a `pre-restore-*.json` snapshot before replacing data and requires typing `RESTORE` to confirm.
+
+Scheduled posts are published by the protected endpoint:
+
+```bash
+curl -fsS -H "Authorization: Bearer $SCHEDULED_PUBLISH_SECRET" \
+  http://127.0.0.1:3000/api/scheduled-publish
+```
+
+Add it to cron if you use scheduled publishing:
+
+```cron
+*/5 * * * * cd /opt/my-blog-production && curl -fsS -H "Authorization: Bearer $SCHEDULED_PUBLISH_SECRET" http://127.0.0.1:3000/api/scheduled-publish >> backups/scheduled-publish.log 2>&1
 ```
 
 Schedule daily backups:

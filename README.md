@@ -12,7 +12,7 @@ It is intended for a public template repository plus a private production reposi
 - Public blog pages: posts, tags, categories, archives, search, RSS, sitemap.
 - Admin workflows: posts, Markdown editor, media, comments, tags, categories, friend links, settings.
 - Publishing controls: public/private posts, pinned posts, scheduled publishing, batch operations.
-- Operations: users, roles, audit logs, backup/restore, health check, Docker/Nginx deployment files.
+- Operations: users, stricter superadmin permissions, audit logs, guarded backup/restore, health check, Docker/Nginx deployment files.
 - Knowledge sync: import/export Markdown content from a configurable private path.
 
 ## Quick Start
@@ -91,7 +91,17 @@ docker compose -f docker-compose.aliyun.yml --profile tools run --rm migrate npm
 docker compose -f docker-compose.aliyun.yml up -d app
 ```
 
+After the first deployment, server updates can use:
+
+```bash
+make aliyun-deploy
+make aliyun-logs
+make aliyun-health
+```
+
 See [docs/ALIYUN_DEPLOYMENT.md](docs/ALIYUN_DEPLOYMENT.md).
+
+Scheduled publishing is handled by `/api/scheduled-publish` and should be called by cron with `SCHEDULED_PUBLISH_SECRET`. The public homepage no longer mutates posts during page rendering, so local development degrades more cleanly when PostgreSQL is down.
 
 Database backup helpers:
 

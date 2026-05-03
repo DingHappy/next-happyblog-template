@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { timingSafeEqual } from 'crypto';
-import prisma from '@/lib/prisma';
+import { publishDuePosts } from '@/lib/scheduled-publish';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,19 +45,9 @@ export async function GET(request: Request) {
   }
 
   try {
-    const now = new Date();
+    const result = await publishDuePosts();
 
-    // 查找所有 scheduledAt <= 当前时间 且 published = false 的文章
-    const postsToPublish = await prisma.post.findMany({
-      where: {
-        scheduledAt: {
-          lte: now,
-        },
-        published: false,
-      },
-    });
-
-    if (postsToPublish.length === 0) {
+    if (result.count === 0) {
       return NextResponse.json({
         success: true,
         message: '没有需要发布的文章',
@@ -65,24 +55,11 @@ export async function GET(request: Request) {
       });
     }
 
-    // 批量更新文章状态
-    const updateResult = await prisma.post.updateMany({
-      where: {
-        id: {
-          in: postsToPublish.map(p => p.id),
-        },
-      },
-      data: {
-        published: true,
-        scheduledAt: null, // 清空定时时间
-      },
-    });
-
     return NextResponse.json({
       success: true,
-      message: `成功发布 ${updateResult.count} 篇文章`,
-      published: updateResult.count,
-      postIds: postsToPublish.map(p => p.id),
+      message: `成功发布 ${result.count} 篇文章`,
+      published: result.count,
+      postIds: result.posts.map((post) => post.id),
     });
   } catch (error) {
     console.error('Scheduled publish error:', error);

@@ -74,6 +74,7 @@ const BACKUP_TABLES = Object.keys(BACKUP_MODELS) as Array<keyof typeof BACKUP_MO
 const RESTORE_DELETE_TABLES = [...BACKUP_TABLES].reverse();
 
 const BACKUP_DIR = path.join(process.cwd(), 'backups');
+const RESTORE_CONFIRMATION = 'RESTORE';
 
 async function ensureBackupDir() {
   try {
@@ -83,30 +84,58 @@ async function ensureBackupDir() {
   }
 }
 
+async function collectBackupData() {
+  const backupData: { version: number; createdAt: string; tables: Record<string, unknown[]> } = {
+    version: 1,
+    createdAt: new Date().toISOString(),
+    tables: {},
+  };
+
+  for (const table of BACKUP_TABLES) {
+    backupData.tables[table] = await BACKUP_MODELS[table].findMany();
+  }
+
+  return backupData;
+}
+
+async function saveBackupFile(prefix = 'backup') {
+  await ensureBackupDir();
+  const backupData = await collectBackupData();
+  const filename = `${prefix}-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+  const filePath = path.join(BACKUP_DIR, filename);
+  await fs.writeFile(filePath, JSON.stringify(backupData, null, 2));
+
+  return { backupData, filename };
+}
+
+function validateRestoreConfirmation(value: FormDataEntryValue | null) {
+  return String(value || '').trim().toUpperCase() === RESTORE_CONFIRMATION;
+}
+
+function resolveBackupPath(filename: string) {
+  if (!/^backup-[\w.-]+\.json$/.test(filename) && !/^pre-restore-[\w.-]+\.json$/.test(filename)) {
+    return null;
+  }
+
+  const filePath = path.resolve(BACKUP_DIR, filename);
+  const backupDir = path.resolve(BACKUP_DIR);
+  if (!filePath.startsWith(`${backupDir}${path.sep}`)) {
+    return null;
+  }
+
+  return filePath;
+}
+
 export async function GET() {
   if (!(await requireRole('superadmin'))) return unauthorizedResponse();
 
   try {
-    const backupData: { version: number; createdAt: string; tables: Record<string, unknown[]> } = {
-      version: 1,
-      createdAt: new Date().toISOString(),
-      tables: {},
-    };
-
-    for (const table of BACKUP_TABLES) {
-      backupData.tables[table] = await BACKUP_MODELS[table].findMany();
-    }
-
+    const { backupData, filename } = await saveBackupFile();
     await createAuditLog({
       action: 'backup',
       resource: 'system',
+      newData: { filename },
     });
-
-    // Also save to backups directory
-    await ensureBackupDir();
-    const filename = `backup-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
-    const filePath = path.join(BACKUP_DIR, filename);
-    await fs.writeFile(filePath, JSON.stringify(backupData, null, 2));
 
     return NextResponse.json(backupData, {
       headers: {
@@ -132,7 +161,7 @@ export async function PATCH() {
     const files = await fs.readdir(BACKUP_DIR);
     const backupFiles = await Promise.all(
       files
-        .filter(f => f.startsWith('backup-') && f.endsWith('.json'))
+        .filter(f => (f.startsWith('backup-') || f.startsWith('pre-restore-')) && f.endsWith('.json'))
         .sort()
         .reverse()
         .map(async (filename) => {
@@ -162,10 +191,18 @@ export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
+    const confirmation = formData.get('confirmation');
 
     if (!file) {
       return NextResponse.json(
         { error: '请上传备份文件' },
+        { status: 400 }
+      );
+    }
+
+    if (!validateRestoreConfirmation(confirmation)) {
+      return NextResponse.json(
+        { error: `请输入 ${RESTORE_CONFIRMATION} 确认恢复操作` },
         { status: 400 }
       );
     }
@@ -183,6 +220,8 @@ export async function POST(request: Request) {
       );
     }
 
+    const preRestore = await saveBackupFile('pre-restore');
+
     for (const table of RESTORE_DELETE_TABLES) {
       await BACKUP_MODELS[table].deleteMany();
     }
@@ -199,9 +238,13 @@ export async function POST(request: Request) {
     await createAuditLog({
       action: 'restore',
       resource: 'system',
+      newData: {
+        source: 'upload',
+        preRestoreBackup: preRestore.filename,
+      },
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, preRestoreBackup: preRestore.filename });
   } catch (error) {
     console.error('Restore error:', error);
     return NextResponse.json(
@@ -217,6 +260,7 @@ export async function DELETE(request: Request) {
   try {
     const url = new URL(request.url);
     const filename = url.searchParams.get('filename');
+    const confirmation = url.searchParams.get('confirmation');
     
     if (!filename) {
       return NextResponse.json(
@@ -225,7 +269,20 @@ export async function DELETE(request: Request) {
       );
     }
 
-    const filePath = path.join(BACKUP_DIR, filename);
+    if (String(confirmation || '').trim().toUpperCase() !== RESTORE_CONFIRMATION) {
+      return NextResponse.json(
+        { error: `请输入 ${RESTORE_CONFIRMATION} 确认恢复操作` },
+        { status: 400 }
+      );
+    }
+
+    const filePath = resolveBackupPath(filename);
+    if (!filePath) {
+      return NextResponse.json(
+        { error: '备份文件名不合法' },
+        { status: 400 }
+      );
+    }
     
     try {
       await fs.access(filePath);
@@ -249,6 +306,8 @@ export async function DELETE(request: Request) {
       );
     }
 
+    const preRestore = await saveBackupFile('pre-restore');
+
     for (const table of RESTORE_DELETE_TABLES) {
       await BACKUP_MODELS[table].deleteMany();
     }
@@ -265,10 +324,13 @@ export async function DELETE(request: Request) {
     await createAuditLog({
       action: 'restore',
       resource: 'system',
-      newData: { filename },
+      newData: {
+        filename,
+        preRestoreBackup: preRestore.filename,
+      },
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, preRestoreBackup: preRestore.filename });
   } catch (error) {
     console.error('Restore from server error:', error);
     return NextResponse.json(

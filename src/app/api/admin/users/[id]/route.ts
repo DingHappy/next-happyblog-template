@@ -7,7 +7,7 @@ import { withAuditLog } from '@/lib/audit';
 type Params = Promise<{ id: string }>;
 
 export async function GET(request: Request, { params }: { params: Params }) {
-  if (!(await requireRole('admin'))) return unauthorizedResponse();
+  if (!(await requireRole('superadmin'))) return unauthorizedResponse();
 
   const { id } = await params;
   const user = await prisma.user.findUnique({
@@ -33,7 +33,7 @@ export async function GET(request: Request, { params }: { params: Params }) {
 }
 
 export async function PATCH(request: Request, { params }: { params: Params }) {
-  if (!(await requireRole('admin'))) return unauthorizedResponse();
+  if (!(await requireRole('superadmin'))) return unauthorizedResponse();
 
   const { id } = await params;
   const body = await request.json();
@@ -88,7 +88,7 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
 }
 
 export async function DELETE(request: Request, { params }: { params: Params }) {
-  if (!(await requireRole('admin'))) return unauthorizedResponse();
+  if (!(await requireRole('superadmin'))) return unauthorizedResponse();
 
   const { id } = await params;
   const currentUser = await getCurrentUser();

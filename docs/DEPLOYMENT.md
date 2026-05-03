@@ -119,6 +119,9 @@ make shell
 
 # 健康检查
 make health
+
+# 本地 Docker 更新：构建、迁移、重启应用
+make deploy
 ```
 
 ### 生产部署（带 Nginx）
@@ -154,6 +157,9 @@ make psql
 ```bash
 # 运行 Prisma 迁移
 make db-migrate
+
+# 创建或重置管理员
+make admin-create
 ```
 
 ### 备份与恢复
@@ -165,6 +171,8 @@ make db-backup
 # 数据库恢复
 make db-restore BACKUP_FILE=backups/backup_20240101_120000.sql
 ```
+
+后台的 JSON 数据恢复会在覆盖数据前自动创建 `pre-restore-*.json`，并要求输入 `RESTORE` 二次确认。
 
 ### 数据库优化
 

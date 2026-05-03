@@ -6,6 +6,9 @@ export interface PostValidationInput {
   excerpt?: string;
   content?: string;
   tags?: unknown;
+  published?: boolean;
+  scheduledAt?: string | Date | null;
+  coverImage?: string | null;
 }
 
 export interface PostValidationResult {
@@ -71,15 +74,19 @@ export function validatePostInput(input: PostValidationInput): PostValidationRes
   const slug = normalizePostSlug(title, String(input.slug || '').trim());
   const excerpt = String(input.excerpt || '').trim() || generateExcerpt(content);
   const tags = normalizeTagNames(input.tags);
+  const scheduledAt = input.scheduledAt ? new Date(input.scheduledAt) : null;
 
   const errors: string[] = [];
   const warnings: string[] = [];
 
   if (!title) errors.push('文章标题不能为空');
+  if (title.length > 90) errors.push('文章标题不能超过 90 个字');
   if (!content) errors.push('文章内容不能为空');
   if (!slug) errors.push('文章 slug 不能为空');
   if (slug.length > 96) errors.push('文章 slug 不能超过 96 个字符');
   if (!/^[\w\u4e00-\u9fa5-]+$/.test(slug)) errors.push('文章 slug 只能包含字母、数字、中文、下划线和短横线');
+  if (excerpt.length > 220) errors.push('文章摘要不能超过 220 个字');
+  if (scheduledAt && Number.isNaN(scheduledAt.getTime())) errors.push('定时发布时间格式不正确');
 
   if (title && title.length < 5) warnings.push('标题偏短，建议至少 5 个字');
   if (title.length > 70) warnings.push('标题偏长，建议控制在 70 个字以内');
@@ -88,6 +95,12 @@ export function validatePostInput(input: PostValidationInput): PostValidationRes
   if (excerpt.length > 180) warnings.push('摘要偏长，建议控制在 180 字以内');
   if (stripMarkdown(content).length < 300) warnings.push('正文偏短，建议至少 300 字');
   if (tags.length > 8) warnings.push('标签较多，建议控制在 8 个以内');
+  if (input.published && scheduledAt && scheduledAt.getTime() > Date.now()) {
+    warnings.push('设置了未来定时时间，建议保持草稿状态等待定时发布任务处理');
+  }
+  if (input.published && !input.coverImage) {
+    warnings.push('建议为已发布文章设置封面图，提升首页列表和分享效果');
+  }
 
   return {
     errors,

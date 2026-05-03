@@ -9,12 +9,28 @@ interface SearchResult {
   slug?: string;
   title: string;
   excerpt: string;
-  category: string;
+  snippet?: string;
+  matchedFields?: string[];
+  category: {
+    name: string;
+    slug: string;
+    color: string;
+  } | null;
+  tags: Array<{
+    id: string;
+    name: string;
+    slug: string;
+  }>;
   coverImage: string | null;
   createdAt: string;
   _count: {
     comments: number;
   };
+}
+
+interface SearchSuggestions {
+  categories: Array<{ id: string; name: string; slug: string }>;
+  tags: Array<{ id: string; name: string; slug: string }>;
 }
 
 interface SearchModalProps {
@@ -25,6 +41,7 @@ interface SearchModalProps {
 export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [suggestions, setSuggestions] = useState<SearchSuggestions>({ categories: [], tags: [] });
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
@@ -34,6 +51,7 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
   const resetSearch = useCallback(() => {
     setQuery('');
     setResults([]);
+    setSuggestions({ categories: [], tags: [] });
     setTotal(0);
     setSelectedIndex(-1);
   }, []);
@@ -47,6 +65,7 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
   const performSearch = useCallback(async (searchQuery: string) => {
     if (!searchQuery.trim()) {
       setResults([]);
+      setSuggestions({ categories: [], tags: [] });
       setTotal(0);
       return;
     }
@@ -56,10 +75,12 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
       const response = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`);
       const data = await response.json();
       setResults(data.results || []);
+      setSuggestions(data.suggestions || { categories: [], tags: [] });
       setTotal(data.total || 0);
     } catch (error) {
       console.error('Search failed:', error);
       setResults([]);
+      setSuggestions({ categories: [], tags: [] });
       setTotal(0);
     } finally {
       setIsLoading(false);
@@ -216,23 +237,35 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
                 >
                   <div className="flex items-start gap-3">
                     <div className={`w-10 h-10 rounded-lg flex-shrink-0 flex items-center justify-center text-white text-sm font-bold ${
-                      post.category === 'daily' 
+                      post.category?.slug === 'daily'
                         ? 'bg-gradient-to-br from-emerald-400 to-green-500'
                         : 'bg-gradient-to-br from-blue-400 to-indigo-500'
                     }`}>
-                      {post.category === 'daily' ? '🌱' : '💻'}
+                      {post.category?.name?.charAt(0) || '#'}
                     </div>
                     <div className="flex-1 min-w-0">
                       <h4 className="font-semibold text-gray-900 mb-1 truncate">
                         {highlightText(post.title, query)}
                       </h4>
                       <p className="text-sm text-gray-500 line-clamp-2">
-                        {highlightText(post.excerpt, query)}
+                        {highlightText(post.snippet || post.excerpt, query)}
                       </p>
                       <div className="flex items-center gap-2 mt-2 text-xs text-gray-400">
                         <span>{new Date(post.createdAt).toLocaleDateString('zh-CN')}</span>
                         <span>·</span>
                         <span>{post._count.comments} 评论</span>
+                        {post.category && (
+                          <>
+                            <span>·</span>
+                            <span>{post.category.name}</span>
+                          </>
+                        )}
+                        {post.matchedFields && post.matchedFields.length > 0 && (
+                          <>
+                            <span>·</span>
+                            <span>匹配 {post.matchedFields.join('/')}</span>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -243,7 +276,32 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
             <div className="flex flex-col items-center justify-center py-16 text-gray-400">
               <div className="text-5xl mb-4">🔍</div>
               <p className="font-medium">没有找到相关文章</p>
-              <p className="text-sm mt-1">试试其他关键词吧</p>
+              {suggestions.categories.length > 0 || suggestions.tags.length > 0 ? (
+                <div className="mt-4 flex flex-wrap justify-center gap-2 px-6">
+                  {suggestions.categories.map((item) => (
+                    <Link
+                      key={`category-${item.id}`}
+                      href={`/?categoryId=${item.id}`}
+                      onClick={closeModal}
+                      className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-600"
+                    >
+                      {item.name}
+                    </Link>
+                  ))}
+                  {suggestions.tags.map((item) => (
+                    <Link
+                      key={`tag-${item.id}`}
+                      href={`/?tagId=${item.id}`}
+                      onClick={closeModal}
+                      className="rounded-full bg-purple-50 px-3 py-1 text-xs font-bold text-purple-600"
+                    >
+                      #{item.name}
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm mt-1">试试其他关键词吧</p>
+              )}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-16 text-gray-400">
