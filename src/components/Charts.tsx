@@ -236,3 +236,160 @@ export function BarChart({ data, height = 180 }: BarChartProps) {
     </div>
   );
 }
+
+interface GeoMapChartProps {
+  data: { name: string; count: number; lat?: number | null; lng?: number | null }[];
+  height?: number;
+}
+
+function projectPoint(lat: number, lng: number) {
+  return {
+    x: ((lng + 180) / 360) * 100,
+    y: ((90 - lat) / 180) * 100,
+  };
+}
+
+export function GeoMapChart({ data, height = 260 }: GeoMapChartProps) {
+  const heatPoints = (data || [])
+    .filter((item): item is { name: string; count: number; lat: number; lng: number } => (
+      typeof item.lat === 'number' && typeof item.lng === 'number'
+    ));
+  const unlocatedCount = (data || [])
+    .filter((item) => typeof item.lat !== 'number' || typeof item.lng !== 'number')
+    .reduce((sum, item) => sum + item.count, 0);
+
+  if (heatPoints.length === 0) {
+    return (
+      <div style={{ height }} className="flex flex-col items-center justify-center text-gray-400 text-sm gap-2">
+        <span>暂无可定位数据</span>
+        {unlocatedCount > 0 && (
+          <span className="text-xs">未定位访问 {unlocatedCount} 次</span>
+        )}
+      </div>
+    );
+  }
+
+  const maxValue = Math.max(...heatPoints.map((item) => item.count), 1);
+
+  return (
+    <div style={{ height }} className="flex flex-col gap-3">
+      <div className="relative flex-1 min-h-0 overflow-hidden rounded-xl bg-sky-50 dark:bg-slate-900 border border-sky-100 dark:border-slate-700">
+        <svg viewBox="0 0 100 52" className="w-full h-full" role="img" aria-label="访客位置地图">
+          <defs>
+            <radialGradient id="analyticsHeatmapGradient">
+              <stop offset="0%" stopColor="#ef4444" stopOpacity="0.95" />
+              <stop offset="34%" stopColor="#f59e0b" stopOpacity="0.7" />
+              <stop offset="67%" stopColor="#22c55e" stopOpacity="0.35" />
+              <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+            </radialGradient>
+            <filter id="analyticsHeatmapBlur" x="-40%" y="-40%" width="180%" height="180%">
+              <feGaussianBlur stdDeviation="2.4" />
+            </filter>
+          </defs>
+
+          <rect width="100" height="52" className="fill-sky-50 dark:fill-slate-900" />
+
+          {[15, 30, 45, 60, 75, 90].map((x) => (
+            <line
+              key={`lng-${x}`}
+              x1={x}
+              y1="0"
+              x2={x}
+              y2="52"
+              className="stroke-sky-100 dark:stroke-slate-800"
+              strokeWidth="0.2"
+            />
+          ))}
+          {[13, 26, 39].map((y) => (
+            <line
+              key={`lat-${y}`}
+              x1="0"
+              y1={y}
+              x2="100"
+              y2={y}
+              className="stroke-sky-100 dark:stroke-slate-800"
+              strokeWidth="0.2"
+            />
+          ))}
+
+          <g className="fill-slate-200 dark:fill-slate-700">
+            <path d="M12 17 C18 9 31 8 37 16 C32 18 30 24 22 24 C17 24 13 22 12 17 Z" />
+            <path d="M24 26 C31 25 36 29 35 37 C34 45 28 48 23 42 C19 37 20 30 24 26 Z" />
+            <path d="M43 15 C51 9 66 10 73 18 C68 22 57 21 50 24 C46 22 42 20 43 15 Z" />
+            <path d="M49 25 C56 23 62 28 61 36 C60 43 53 46 49 40 C45 34 45 28 49 25 Z" />
+            <path d="M69 22 C77 16 87 17 92 25 C87 30 76 31 70 27 Z" />
+            <path d="M78 35 C84 34 90 38 89 43 C85 46 78 44 76 39 Z" />
+          </g>
+
+          <g filter="url(#analyticsHeatmapBlur)">
+            {heatPoints.map((item) => {
+              const point = projectPoint(item.lat, item.lng);
+              const intensity = item.count / maxValue;
+              const radius = 5 + intensity * 11;
+              return (
+                <circle
+                  key={`heat-${item.name}`}
+                  cx={point.x}
+                  cy={point.y}
+                  r={radius}
+                  fill="url(#analyticsHeatmapGradient)"
+                  opacity={0.45 + intensity * 0.45}
+                />
+              );
+            })}
+          </g>
+
+          {heatPoints.map((item) => {
+            const point = projectPoint(item.lat, item.lng);
+            const intensity = item.count / maxValue;
+            return (
+              <g key={item.name}>
+                <circle
+                  cx={point.x}
+                  cy={point.y}
+                  r="0.9"
+                  className="fill-white"
+                  opacity={0.9}
+                />
+                <circle
+                  cx={point.x}
+                  cy={point.y}
+                  r="0.45"
+                  fill={intensity > 0.65 ? '#991b1b' : '#1d4ed8'}
+                >
+                  <title>{`${item.name}: ${item.count}`}</title>
+                </circle>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+
+      <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+        <span>低</span>
+        <div
+          className="h-2 flex-1 rounded-full"
+          style={{ background: 'linear-gradient(90deg, #3b82f6, #22c55e, #f59e0b, #ef4444)' }}
+        />
+        <span>高</span>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {heatPoints.slice(0, 4).map((item) => (
+          <div key={item.name} className="flex items-center gap-2 text-xs min-w-0">
+            <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
+            <span className="text-gray-600 dark:text-gray-400 truncate">{item.name}</span>
+            <span className="ml-auto font-medium text-gray-900 dark:text-white">{item.count}</span>
+          </div>
+        ))}
+        {unlocatedCount > 0 && (
+          <div className="flex items-center gap-2 text-xs min-w-0">
+            <span className="w-2 h-2 rounded-full bg-gray-300 dark:bg-slate-600 flex-shrink-0" />
+            <span className="text-gray-500 dark:text-gray-400 truncate">未定位</span>
+            <span className="ml-auto font-medium text-gray-900 dark:text-white">{unlocatedCount}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -10,6 +10,11 @@ type ActiveView = {
   viewId?: string;
 };
 
+function getTrafficReferrer() {
+  if (typeof document === 'undefined') return null;
+  return document.referrer || null;
+}
+
 function AnalyticsInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -70,6 +75,7 @@ function AnalyticsInner({ children }: { children: React.ReactNode }) {
         path: currentPath,
         postId,
         sessionId: sessionIdRef.current,
+        referrer: getTrafficReferrer(),
       }),
     })
       .then((res) => res.ok ? res.json() : null)

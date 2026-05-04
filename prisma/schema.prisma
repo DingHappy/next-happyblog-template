@@ -110,6 +110,8 @@ model AnalyticsSession {
   country   String?
   region    String?
   city      String?
+  latitude  Float?
+  longitude Float?
   device    String? // desktop, mobile, tablet
   browser   String?
   os        String?
@@ -120,6 +122,7 @@ model AnalyticsSession {
   @@index([visitorId])
   @@index([createdAt])
   @@index([country])
+  @@index([latitude, longitude])
   @@index([device])
   @@index([isBot])
 }

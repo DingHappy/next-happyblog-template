@@ -6,6 +6,119 @@ export const dynamic = 'force-dynamic';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ANALYTICS_TIME_ZONE = process.env.ANALYTICS_TIME_ZONE || 'Asia/Shanghai';
+const LOCATION_COORDS: Record<string, { lat: number; lng: number }> = {
+  CN: { lat: 35.8617, lng: 104.1954 },
+  HK: { lat: 22.3193, lng: 114.1694 },
+  MO: { lat: 22.1987, lng: 113.5439 },
+  TW: { lat: 23.6978, lng: 120.9605 },
+  JP: { lat: 36.2048, lng: 138.2529 },
+  KR: { lat: 35.9078, lng: 127.7669 },
+  SG: { lat: 1.3521, lng: 103.8198 },
+  US: { lat: 37.0902, lng: -95.7129 },
+  CA: { lat: 56.1304, lng: -106.3468 },
+  GB: { lat: 55.3781, lng: -3.436 },
+  DE: { lat: 51.1657, lng: 10.4515 },
+  FR: { lat: 46.2276, lng: 2.2137 },
+  NL: { lat: 52.1326, lng: 5.2913 },
+  AU: { lat: -25.2744, lng: 133.7751 },
+  IN: { lat: 20.5937, lng: 78.9629 },
+  BR: { lat: -14.235, lng: -51.9253 },
+  MX: { lat: 23.6345, lng: -102.5528 },
+  AR: { lat: -38.4161, lng: -63.6167 },
+  CL: { lat: -35.6751, lng: -71.543 },
+  CO: { lat: 4.5709, lng: -74.2973 },
+  PE: { lat: -9.19, lng: -75.0152 },
+  ES: { lat: 40.4637, lng: -3.7492 },
+  IT: { lat: 41.8719, lng: 12.5674 },
+  PT: { lat: 39.3999, lng: -8.2245 },
+  IE: { lat: 53.1424, lng: -7.6921 },
+  CH: { lat: 46.8182, lng: 8.2275 },
+  SE: { lat: 60.1282, lng: 18.6435 },
+  NO: { lat: 60.472, lng: 8.4689 },
+  FI: { lat: 61.9241, lng: 25.7482 },
+  DK: { lat: 56.2639, lng: 9.5018 },
+  PL: { lat: 51.9194, lng: 19.1451 },
+  RU: { lat: 61.524, lng: 105.3188 },
+  TR: { lat: 38.9637, lng: 35.2433 },
+  IL: { lat: 31.0461, lng: 34.8516 },
+  AE: { lat: 23.4241, lng: 53.8478 },
+  SA: { lat: 23.8859, lng: 45.0792 },
+  TH: { lat: 15.87, lng: 100.9925 },
+  VN: { lat: 14.0583, lng: 108.2772 },
+  MY: { lat: 4.2105, lng: 101.9758 },
+  ID: { lat: -0.7893, lng: 113.9213 },
+  PH: { lat: 12.8797, lng: 121.774 },
+  NZ: { lat: -40.9006, lng: 174.886 },
+  ZA: { lat: -30.5595, lng: 22.9375 },
+  EG: { lat: 26.8206, lng: 30.8025 },
+  NG: { lat: 9.082, lng: 8.6753 },
+};
+
+const LOCATION_ALIASES: Record<string, string> = {
+  CHINA: 'CN',
+  中国: 'CN',
+  'HONG KONG': 'HK',
+  香港: 'HK',
+  香港特别行政区: 'HK',
+  MACAU: 'MO',
+  MACAO: 'MO',
+  澳门: 'MO',
+  澳门特别行政区: 'MO',
+  TAIWAN: 'TW',
+  台湾: 'TW',
+  台湾省: 'TW',
+  JAPAN: 'JP',
+  日本: 'JP',
+  KOREA: 'KR',
+  韩国: 'KR',
+  SINGAPORE: 'SG',
+  新加坡: 'SG',
+  'UNITED STATES': 'US',
+  USA: 'US',
+  美国: 'US',
+  CANADA: 'CA',
+  加拿大: 'CA',
+  'UNITED KINGDOM': 'GB',
+  UK: 'GB',
+  英国: 'GB',
+  GERMANY: 'DE',
+  德国: 'DE',
+  FRANCE: 'FR',
+  法国: 'FR',
+  NETHERLANDS: 'NL',
+  AUSTRALIA: 'AU',
+  INDIA: 'IN',
+  BRAZIL: 'BR',
+  MEXICO: 'MX',
+  ARGENTINA: 'AR',
+  CHILE: 'CL',
+  COLOMBIA: 'CO',
+  PERU: 'PE',
+  SPAIN: 'ES',
+  ITALY: 'IT',
+  PORTUGAL: 'PT',
+  IRELAND: 'IE',
+  SWITZERLAND: 'CH',
+  SWEDEN: 'SE',
+  NORWAY: 'NO',
+  FINLAND: 'FI',
+  DENMARK: 'DK',
+  POLAND: 'PL',
+  RUSSIA: 'RU',
+  TURKEY: 'TR',
+  ISRAEL: 'IL',
+  'UNITED ARAB EMIRATES': 'AE',
+  'SAUDI ARABIA': 'SA',
+  THAILAND: 'TH',
+  VIETNAM: 'VN',
+  MALAYSIA: 'MY',
+  INDONESIA: 'ID',
+  PHILIPPINES: 'PH',
+  'NEW ZEALAND': 'NZ',
+  'SOUTH AFRICA': 'ZA',
+  EGYPT: 'EG',
+  NIGERIA: 'NG',
+};
 
 function startOfDay(date: Date) {
   const d = new Date(date);
@@ -40,6 +153,32 @@ function groupRows(rows: { name: string | null; count: number }[]) {
   }));
 }
 
+function formatLocation(row: { country: string | null; region: string | null; city: string | null }) {
+  const parts = [row.country, row.region, row.city]
+    .filter((part): part is string => Boolean(part));
+  return parts.length > 0 ? parts.join(' / ') : 'unknown';
+}
+
+function getLocationCoords(country: string | null) {
+  if (!country) return { lat: null, lng: null };
+  const key = country.trim().toUpperCase();
+  const normalized = LOCATION_ALIASES[key] || key;
+  const coords = LOCATION_COORDS[normalized];
+  return coords ? { lat: coords.lat, lng: coords.lng } : { lat: null, lng: null };
+}
+
+function getResolvedLocationCoords(row: {
+  country: string | null;
+  latitude: number | null;
+  longitude: number | null;
+}) {
+  if (typeof row.latitude === 'number' && typeof row.longitude === 'number') {
+    return { lat: row.latitude, lng: row.longitude };
+  }
+
+  return getLocationCoords(row.country);
+}
+
 function getHost(value: string | undefined | null) {
   if (!value) return null;
   try {
@@ -62,17 +201,41 @@ function getInternalHosts(req: Request) {
 
 function normalizeSourceHost(host: string) {
   if (host.endsWith('google.com')) return 'google';
+  if (host.endsWith('google.com.hk')) return 'google';
+  if (host.endsWith('google.com.tw')) return 'google';
   if (host.endsWith('baidu.com')) return 'baidu';
   if (host.endsWith('bing.com')) return 'bing';
+  if (host.endsWith('duckduckgo.com')) return 'duckduckgo';
   if (host.endsWith('github.com')) return 'github';
   if (host.endsWith('zhihu.com')) return 'zhihu';
   if (host.endsWith('x.com') || host.endsWith('twitter.com')) return 'x';
   if (host.endsWith('weibo.com')) return 'weibo';
   if (host.endsWith('juejin.cn')) return 'juejin';
+  if (host.endsWith('linkedin.com')) return 'linkedin';
+  if (host.endsWith('facebook.com')) return 'facebook';
   return host;
 }
 
-function classifyReferer(referer: string | null, internalHosts: Set<string>) {
+function getCampaignSource(path: string | null) {
+  if (!path) return null;
+  try {
+    const params = new URL(path, 'https://local.invalid').searchParams;
+    const source = params.get('utm_source') || params.get('source') || params.get('ref');
+    if (!source) return null;
+    return source.trim().toLowerCase().replace(/\s+/g, '-').slice(0, 60) || null;
+  } catch {
+    return null;
+  }
+}
+
+function classifyReferer(
+  referer: string | null,
+  internalHosts: Set<string>,
+  path: string | null = null
+) {
+  const campaignSource = getCampaignSource(path);
+  if (campaignSource) return campaignSource;
+
   const host = getHost(referer);
   if (!host) return 'direct';
   if (internalHosts.has(host)) return 'internal';
@@ -82,6 +245,19 @@ function classifyReferer(referer: string | null, internalHosts: Set<string>) {
 function percentChange(current: number, previous: number) {
   if (previous === 0) return current > 0 ? 100 : 0;
   return Math.round(((current - previous) / previous) * 100);
+}
+
+async function getLocationSessions(since: Date) {
+  return prisma.analyticsSession.findMany({
+    where: { createdAt: { gte: since }, isBot: false },
+    select: { country: true, region: true, city: true, latitude: true, longitude: true },
+  }).catch(async () => {
+    const rows = await prisma.analyticsSession.findMany({
+      where: { createdAt: { gte: since }, isBot: false },
+      select: { country: true, region: true, city: true },
+    });
+    return rows.map((row) => ({ ...row, latitude: null, longitude: null }));
+  });
 }
 
 export async function GET(req: Request) {
@@ -105,6 +281,7 @@ export async function GET(req: Request) {
       topPostViews,
       devices,
       browsers,
+      locationSessions,
       refererRows,
     ] = await Promise.all([
       prisma.postView.count({ where: { createdAt: { gte: since } } }),
@@ -163,9 +340,10 @@ export async function GET(req: Request) {
         orderBy: { _count: { browser: 'desc' } },
         take: 6,
       }),
+      getLocationSessions(since),
       prisma.postView.findMany({
         where: { createdAt: { gte: since } },
-        select: { referer: true },
+        select: { referer: true, path: true },
       }),
     ]);
 
@@ -196,10 +374,30 @@ export async function GET(req: Request) {
       name: row.browser,
       count: row._count?._all || 0,
     })));
+    const locationCounts = new Map<string, {
+      name: string;
+      count: number;
+      lat: number | null;
+      lng: number | null;
+    }>();
+    for (const row of locationSessions) {
+      const location = formatLocation(row);
+      const coords = getResolvedLocationCoords(row);
+      const key = `${location}|${coords.lat ?? ''}|${coords.lng ?? ''}`;
+      const current = locationCounts.get(key);
+      locationCounts.set(key, {
+        name: location,
+        count: (current?.count || 0) + 1,
+        ...coords,
+      });
+    }
+    const locationRows = Array.from(locationCounts.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
     const sourceCounts = new Map<string, number>();
     let internalReferrals = 0;
     for (const row of refererRows) {
-      const source = classifyReferer(row.referer, internalHosts);
+      const source = classifyReferer(row.referer, internalHosts, row.path);
       if (source === 'internal') {
         internalReferrals += 1;
         continue;
@@ -243,6 +441,7 @@ export async function GET(req: Request) {
       }),
       devices: deviceRows,
       browsers: browserRows,
+      locations: locationRows,
       referers: sourceRows,
       internalReferrals,
     });
