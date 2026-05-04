@@ -22,6 +22,35 @@
     "placeholder": "Write a comment…",
     "tooFrequent": "Too many comments — please slow down."
   },
+  "archives": {
+    "title": "Archives",
+    "subtitle": "All published posts organized by year for easy reference.",
+    "statPosts": "Posts",
+    "statYears": "Years",
+    "statLatest": "Latest",
+    "noPosts": "No posts published yet",
+    "noPostsHint": "Published posts will be grouped by year automatically.",
+    "backHome": "Back to home",
+    "years": "Years",
+    "postCount": "{count} posts",
+    "views": "{count} views",
+    "comments": "{count} comments",
+    "likes": "{count} likes",
+    "private": "🔒 Private"
+  },
+  "post": {
+    "notFound": "Post not found",
+    "notFoundHint": "This post may have been deleted or does not exist.",
+    "backHome": "← Back to home",
+    "private": "🔒 Private post",
+    "minutesRead": "About {minutes} min read",
+    "breadcrumbHome": "Home",
+    "relatedPosts": "Related posts",
+    "tableOfContents": "On this page",
+    "author": "Author",
+    "share": "Share",
+    "notFoundMeta": "Post not found"
+  },
   "home": {
     "allPosts": "📋 All posts",
     "noPosts": "No posts yet",

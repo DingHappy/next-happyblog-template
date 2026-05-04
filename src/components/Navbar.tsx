@@ -14,7 +14,7 @@ import { siteConfig } from '@/config/site';
 // path; useful while we migrate one page at a time.
 const NAV_LINKS = [
   { href: '/', key: 'home', i18n: true },
-  { href: '/archives', key: 'archives', i18n: false },
+  { href: '/archives', key: 'archives', i18n: true },
   { href: '/about', key: 'about', i18n: true },
 ] as const;
 
@@ -247,7 +247,7 @@ export default function Navbar() {
                       return (
                         <Link
                           key={post.id}
-                          href={`/posts/${post.slug || post.id}`}
+                          href={localizePathname(`/posts/${post.slug || post.id}`, locale)}
                           onClick={() => setIsSearchOpen(false)}
                           className="block px-4 py-3 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 transition-all"
                         >

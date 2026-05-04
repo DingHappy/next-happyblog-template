@@ -3,10 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale } from "next-intl/server";
 import "./globals.css";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
-import BackToTop from "@/components/BackToTop";
-import MobileBottomNav from "@/components/MobileBottomNav";
+import AppShell from "@/components/AppShell";
 import AnalyticsProvider from "@/components/AnalyticsProvider";
 import { FeedbackProvider } from "@/components/FeedbackProvider";
 import { siteUrl } from "@/lib/site";
@@ -68,11 +65,7 @@ export default async function RootLayout({
         <NextIntlClientProvider>
           <FeedbackProvider>
             <AnalyticsProvider>
-              <Navbar />
-              <main className="flex-1 pb-20 lg:pb-0">{children}</main>
-              <Footer />
-              <BackToTop />
-              <MobileBottomNav />
+              <AppShell>{children}</AppShell>
             </AnalyticsProvider>
           </FeedbackProvider>
         </NextIntlClientProvider>

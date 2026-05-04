@@ -10,10 +10,18 @@ const LABEL: Record<string, string> = {
   en: 'EN',
 };
 
+// 不在 [locale]/ 下的路径(admin 等)切换语言时,直接跳到目标语言的首页,
+// 避免 /en/admin/... 这类本地化前缀指向不存在路由导致的 404。
+const NON_LOCALIZED_PREFIXES = ['/admin'];
+
 export default function LocaleSwitcher() {
   const pathname = usePathname();
   const current = getPathnameLocale(pathname) ?? routing.defaultLocale;
   const next = routing.locales.find((l) => l !== current) ?? current;
+  const isNonLocalized = NON_LOCALIZED_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(prefix + '/')
+  );
+  if (isNonLocalized) return null;
   const href = localizePathname(pathname, next);
 
   return (

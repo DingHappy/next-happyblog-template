@@ -343,7 +343,7 @@ export default async function Home({
 
             <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden transition-colors">
               <div className="px-4 pt-4 pb-1">
-                <PlainLink href="/archives" className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-300 transition-colors">
+                <PlainLink href={`/${locale}/archives`} className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-300 transition-colors">
                   {t('sections.archives')}
                 </PlainLink>
               </div>
@@ -353,7 +353,7 @@ export default async function Home({
                 ) : archiveYears.map(([year, count]) => (
                   <PlainLink
                     key={year}
-                    href={`/archives#year-${year}`}
+                    href={`/${locale}/archives#year-${year}`}
                     className="flex items-center px-3 py-2.5 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 dark:hover:from-slate-700 dark:hover:to-slate-700 hover:text-purple-700 dark:hover:text-purple-300 transition-all"
                   >
                     <span className="flex-grow truncate">{year}</span>
@@ -395,7 +395,7 @@ export default async function Home({
                 {t('noPosts')}
               </div>
             ) : posts.map((post, index) => {
-              const postHref = `/posts/${post.slug || post.id}`;
+              const postHref = `/${locale}/posts/${post.slug || post.id}`;
               return (
               <PlainLink
                 key={post.id}
@@ -558,7 +558,7 @@ export default async function Home({
                 {posts.slice(0, 5).map((post, index) => (
                   <PlainLink
                     key={post.id}
-                    href={`/posts/${post.slug || post.id}`}
+                    href={`/${locale}/posts/${post.slug || post.id}`}
                     className="group flex items-start gap-3 p-2 -mx-2 rounded-xl hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 dark:hover:from-slate-800 dark:hover:to-slate-700 transition-all duration-300"
                   >
                     <span className="flex-shrink-0 w-6 h-6 rounded-lg bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold shadow-sm">

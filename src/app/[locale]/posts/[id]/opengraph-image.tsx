@@ -9,16 +9,16 @@ export const alt = 'Post preview';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
-function formatDate(date: Date) {
-  return date.toLocaleDateString('zh-CN', {
+function formatDate(date: Date, locale: string) {
+  return date.toLocaleDateString(locale === 'zh' ? 'zh-CN' : 'en-US', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
   });
 }
 
-export default async function Image({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export default async function Image({ params }: { params: Promise<{ locale: string; id: string }> }) {
+  const { locale, id } = await params;
   const decoded = (() => {
     try {
       return decodeURIComponent(id);
@@ -45,7 +45,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   const title = post?.title ?? siteConfig.name;
   const categoryName = post?.category?.name ?? '';
   const categoryColor = post?.category?.color ?? '#9333ea';
-  const dateText = post ? formatDate(post.createdAt) : '';
+  const dateText = post ? formatDate(post.createdAt, locale) : '';
 
   const font = await loadCjkFont();
 

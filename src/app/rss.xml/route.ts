@@ -1,6 +1,7 @@
 import prisma from '@/lib/prisma';
 import { absoluteUrl } from '@/lib/site';
 import { siteConfig } from '@/config/site';
+import { routing } from '@/i18n/routing';
 
 function escapeXml(value: string) {
   return value
@@ -29,7 +30,7 @@ export async function GET() {
   });
 
   const items = posts.map(post => {
-    const url = absoluteUrl(`/posts/${post.slug || post.id}`);
+    const url = absoluteUrl(`/${routing.defaultLocale}/posts/${post.slug || post.id}`);
     return `
       <item>
         <title>${escapeXml(post.title)}</title>
@@ -46,7 +47,7 @@ export async function GET() {
     <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
       <channel>
         <title>${escapeXml(siteConfig.name)}</title>
-        <link>${escapeXml(absoluteUrl('/'))}</link>
+        <link>${escapeXml(absoluteUrl(`/${routing.defaultLocale}`))}</link>
         <atom:link href="${escapeXml(absoluteUrl('/rss.xml'))}" rel="self" type="application/rss+xml" />
         <description>${escapeXml(siteConfig.description)}</description>
         <language>${escapeXml(siteConfig.language)}</language>

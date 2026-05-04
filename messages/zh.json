@@ -22,6 +22,35 @@
     "placeholder": "写下你的评论…",
     "tooFrequent": "评论过于频繁，请稍后再试"
   },
+  "archives": {
+    "title": "文章归档",
+    "subtitle": "按年份整理所有已发布文章，方便快速回看过去的记录。",
+    "statPosts": "文章",
+    "statYears": "年份",
+    "statLatest": "最近更新",
+    "noPosts": "暂无已发布文章",
+    "noPostsHint": "发布文章后，这里会自动按年份归档。",
+    "backHome": "返回首页",
+    "years": "年份",
+    "postCount": "{count} 篇",
+    "views": "{count} 阅读",
+    "comments": "{count} 评论",
+    "likes": "{count} 点赞",
+    "private": "🔒 不公开"
+  },
+  "post": {
+    "notFound": "文章不存在",
+    "notFoundHint": "这篇文章可能已经被删除或不存在",
+    "backHome": "← 返回首页",
+    "private": "🔒 不公开文章",
+    "minutesRead": "约 {minutes} 分钟阅读",
+    "breadcrumbHome": "首页",
+    "relatedPosts": "相关文章",
+    "tableOfContents": "目录",
+    "author": "作者",
+    "share": "分享",
+    "notFoundMeta": "文章不存在"
+  },
   "home": {
     "allPosts": "📋 全部文章",
     "noPosts": "暂无文章",
