@@ -252,6 +252,9 @@ async function upsertPost(input: IncomingPost): Promise<UpsertResult> {
         tags: { set: tagRows.map((t) => ({ id: t.id })) },
       },
     });
+    // Drop any stale autosaved draft so the editor doesn't "restore" it
+    // over the content we just pushed.
+    await prisma.postDraft.deleteMany({ where: { postId: existing.id } });
     return { sourcePath, status: 'updated', postId: existing.id, slug };
   }
 
