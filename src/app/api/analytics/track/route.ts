@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createHash } from 'crypto';
 import { isIP } from 'net';
 import IP2Region from 'ip2region';
+import maxmind, { CityResponse, Reader } from 'maxmind';
 import prisma from '@/lib/prisma';
 
 type GeoInfo = {
@@ -14,6 +15,7 @@ type GeoInfo = {
 
 const GEO_CACHE = new Map<string, { value: GeoInfo; expiresAt: number }>();
 const GEO_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+let maxmindReaderPromise: Promise<Reader<CityResponse> | null> | null = null;
 let ip2RegionReader: IP2Region | null = null;
 
 const CHINA_REGION_COORDS: Record<string, { lat: number; lng: number }> = {
@@ -232,6 +234,51 @@ function emptyGeo(): GeoInfo {
   return { country: null, region: null, city: null, latitude: null, longitude: null };
 }
 
+function parseMaxMindGeoResponse(data: CityResponse | null): GeoInfo {
+  if (!data) return emptyGeo();
+  return {
+    country: cleanGeoValue(data.country?.iso_code)
+      || cleanGeoValue(data.registered_country?.iso_code)
+      || cleanGeoValue(data.country?.names?.en)
+      || cleanGeoValue(data.registered_country?.names?.en),
+    region: cleanGeoValue(data.subdivisions?.[0]?.names?.en)
+      || cleanGeoValue(data.subdivisions?.[0]?.iso_code),
+    city: cleanGeoValue(data.city?.names?.en),
+    latitude: cleanCoordinate(data.location?.latitude),
+    longitude: cleanCoordinate(data.location?.longitude),
+  };
+}
+
+function getMaxMindReader() {
+  const dbPath = process.env.ANALYTICS_MAXMIND_DB_PATH;
+  if (!dbPath) return null;
+
+  maxmindReaderPromise ??= maxmind.open<CityResponse>(dbPath, {
+    cache: { max: 10000 },
+    watchForUpdates: true,
+    watchForUpdatesNonPersistent: true,
+  }).catch((error) => {
+    console.error('Failed to open MaxMind database:', error);
+    maxmindReaderPromise = null;
+    return null;
+  });
+
+  return maxmindReaderPromise;
+}
+
+async function lookupMaxMindByIp(ip: string | null): Promise<GeoInfo> {
+  if (!isPublicIp(ip)) return emptyGeo();
+
+  const reader = await getMaxMindReader();
+  if (!reader) return emptyGeo();
+
+  try {
+    return parseMaxMindGeoResponse(reader.get(ip as string));
+  } catch {
+    return emptyGeo();
+  }
+}
+
 function getIp2RegionReader() {
   ip2RegionReader ??= new IP2Region({
     ipv4db: process.env.ANALYTICS_IP2REGION_IPV4_DB || undefined,
@@ -338,6 +385,9 @@ async function lookupRemoteGeoByIp(ip: string | null): Promise<GeoInfo> {
 }
 
 async function resolveGeo(req: NextRequest, ip: string | null) {
+  const maxMindGeo = await lookupMaxMindByIp(ip);
+  if (hasGeo(maxMindGeo)) return maxMindGeo;
+
   const ip2RegionGeo = await lookupIp2RegionByIp(ip);
   if (hasGeo(ip2RegionGeo)) return ip2RegionGeo;
 
