@@ -29,7 +29,7 @@ export default async function PreviewPost({ params }: { params: Promise<{ id: st
   return (
     <div className="min-h-screen bg-white">
       <div className="sticky top-0 bg-white/90 backdrop-blur-sm border-b border-gray-100 z-50">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-4xl mx-auto pl-14 pr-4 py-3 md:px-4 flex items-center justify-between">
           <Link
             href={`/admin/posts/${post.id}/edit`}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"

@@ -238,7 +238,7 @@ export default function EditPost({ params }: { params: Promise<{ id: string }> }
     <div className="min-h-screen bg-gray-50">
       {/* 顶部导航 */}
       <header className="bg-white border-b border-gray-100 shadow-sm sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 py-4">
+        <div className="max-w-6xl mx-auto pl-14 pr-4 py-4 md:px-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button

@@ -147,7 +147,7 @@ export default function PostVersionsPage() {
 
       <div className="flex-1 flex flex-col">
         <header className="bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700 shadow-sm sticky top-0 z-10 transition-colors">
-          <div className="max-w-6xl mx-auto px-6 py-4">
+          <div className="max-w-6xl mx-auto pl-14 pr-6 py-4 md:px-6">
             <div className="flex items-center gap-4">
               <Link
                 href="/admin/posts"
