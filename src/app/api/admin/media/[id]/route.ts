@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAuth, unauthorizedResponse } from '@/lib/auth';
 import { withAuditLog } from '@/lib/audit';
+import { requirePermission } from '@/lib/permissions';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -10,7 +10,8 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!(await requireAuth())) return unauthorizedResponse();
+  const auth = await requirePermission('media:manage');
+  if (!auth.ok) return auth.response;
 
   try {
     const { id } = await params;

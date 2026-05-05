@@ -10,6 +10,7 @@ export interface AdminPostRow {
   title: string;
   slug: string;
   published: boolean;
+  status: string;
   isPublic: boolean;
   isPinned: boolean;
   scheduledAt: string | null;
@@ -26,7 +27,17 @@ export interface AdminPostRow {
     name: string;
     slug: string;
   }[];
+  author: {
+    id: string;
+    username: string;
+    displayName: string | null;
+  } | null;
   commentsCount: number;
+}
+
+export interface AdminCurrentUser {
+  id: string;
+  role: 'superadmin' | 'admin' | 'editor' | 'author';
 }
 
 export interface AdminPostCategory {
@@ -71,7 +82,7 @@ type BatchAction =
   | 'set-tags'
   | 'add-tags'
   | 'remove-tags';
-type StatusFilter = 'all' | 'published' | 'draft' | 'scheduled' | 'public' | 'private' | 'pinned';
+type StatusFilter = 'all' | 'published' | 'draft' | 'scheduled' | 'pending' | 'rejected' | 'public' | 'private' | 'pinned';
 type SortOption =
   | 'createdAt-desc'
   | 'createdAt-asc'
@@ -92,6 +103,8 @@ interface BatchRequestBody {
 }
 
 function statusLabel(post: AdminPostRow) {
+  if (post.status === 'pending') return '待审核';
+  if (post.status === 'rejected') return '已驳回';
   if (post.scheduledAt && !post.published) {
     return `定时发布 (${new Date(post.scheduledAt).toLocaleDateString('zh-CN')})`;
   }
@@ -99,6 +112,12 @@ function statusLabel(post: AdminPostRow) {
 }
 
 function statusClass(post: AdminPostRow) {
+  if (post.status === 'pending') {
+    return 'bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300';
+  }
+  if (post.status === 'rejected') {
+    return 'bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300';
+  }
   if (post.scheduledAt && !post.published) {
     return 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300';
   }
@@ -114,6 +133,7 @@ export default function AdminPostsTable({
   filters,
   pagination,
   totalPosts,
+  currentUser,
 }: {
   posts: AdminPostRow[];
   categories: AdminPostCategory[];
@@ -121,7 +141,10 @@ export default function AdminPostsTable({
   filters: AdminPostFilters;
   pagination: AdminPostsPagination;
   totalPosts: number;
+  currentUser: AdminCurrentUser;
 }) {
+  const canReview = currentUser.role !== 'author';
+  const isAuthorRole = currentUser.role === 'author';
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -238,6 +261,56 @@ export default function AdminPostsTable({
     });
   };
 
+  const submitForReview = async (id: string) => {
+    const ok = await confirm({ message: '确定提交本文进入审核吗？提交后在审批前将不能再编辑发布状态。' });
+    if (!ok) return;
+    const response = await fetch(`/api/admin/posts/${id}/submit`, { method: 'POST' });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      toast(data.error || '提交失败', 'error');
+      return;
+    }
+    toast('已提交审核', 'success');
+    startTransition(() => router.refresh());
+  };
+
+  const approve = async (id: string) => {
+    const ok = await confirm({ message: '确认批准发布该文章？' });
+    if (!ok) return;
+    const response = await fetch(`/api/admin/posts/${id}/review`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision: 'approve' }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      toast(data.error || '操作失败', 'error');
+      return;
+    }
+    toast('已批准发布', 'success');
+    startTransition(() => router.refresh());
+  };
+
+  const reject = async (id: string) => {
+    const note = window.prompt('请填写驳回原因（必填）：') || '';
+    if (!note.trim()) {
+      toast('驳回必须填写原因', 'error');
+      return;
+    }
+    const response = await fetch(`/api/admin/posts/${id}/review`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision: 'reject', note: note.trim() }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      toast(data.error || '操作失败', 'error');
+      return;
+    }
+    toast('已驳回', 'success');
+    startTransition(() => router.refresh());
+  };
+
   const deleteOne = async (id: string) => {
     const ok = await confirm({
       message: '确定要删除这篇文章吗？此操作不可恢复。',
@@ -310,6 +383,8 @@ export default function AdminPostsTable({
                     <option value="all">全部状态</option>
                     <option value="published">已发布</option>
                     <option value="draft">草稿</option>
+                    <option value="pending">待审核</option>
+                    <option value="rejected">已驳回</option>
                     <option value="scheduled">定时发布</option>
                     <option value="public">公开</option>
                     <option value="private">不公开</option>
@@ -471,6 +546,15 @@ export default function AdminPostsTable({
                   <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-400">{post.commentsCount}</td>
                   <td className="whitespace-nowrap px-4 py-4 text-sm text-gray-600 dark:text-gray-400">{new Date(post.createdAt).toLocaleDateString('zh-CN')}</td>
                   <td className="whitespace-nowrap px-4 py-4 text-right">
+                    {isAuthorRole && (post.status === 'draft' || post.status === 'rejected') && (
+                      <button onClick={() => submitForReview(post.id)} className="mr-4 text-sm font-medium text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300">提交审核</button>
+                    )}
+                    {canReview && post.status === 'pending' && (
+                      <>
+                        <button onClick={() => approve(post.id)} className="mr-4 text-sm font-medium text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300">批准</button>
+                        <button onClick={() => reject(post.id)} className="mr-4 text-sm font-medium text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300">驳回</button>
+                      </>
+                    )}
                     <Link href={`/admin/posts/${post.id}/versions`} className="mr-4 text-sm font-medium text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300">版本</Link>
                     <Link href={`/admin/posts/${post.id}/edit`} className="mr-4 text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">编辑</Link>
                     <button onClick={() => deleteOne(post.id)} className="text-sm font-medium text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300">删除</button>

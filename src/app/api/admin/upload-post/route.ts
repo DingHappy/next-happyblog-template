@@ -204,6 +204,7 @@ async function upsertPost(input: IncomingPost): Promise<UpsertResult> {
 
   const tags = asStringArray(fm.tags) || asStringArray(fm.tag);
   const published = asBoolean(fm.published) ?? true;
+  const status = published ? 'published' : 'draft';
   let isPublic =
     asBoolean(fm.isPublic) ??
     asBoolean(fm.public) ??
@@ -227,6 +228,7 @@ async function upsertPost(input: IncomingPost): Promise<UpsertResult> {
     if (
       existing.sourceHash === hash &&
       existing.published === published &&
+      existing.status === status &&
       existing.isPublic === isPublic
     ) {
       return { sourcePath, status: 'skipped', postId: existing.id, slug: existing.slug };
@@ -246,6 +248,7 @@ async function upsertPost(input: IncomingPost): Promise<UpsertResult> {
         sourceHash: hash,
         sourcePath,
         published,
+        status,
         isPublic,
         coverImage: coverImage || null,
         categoryId: cat.id,
@@ -272,6 +275,7 @@ async function upsertPost(input: IncomingPost): Promise<UpsertResult> {
       sourcePath,
       categoryId: cat.id,
       published,
+      status,
       isPublic,
       coverImage: coverImage || null,
       tags:

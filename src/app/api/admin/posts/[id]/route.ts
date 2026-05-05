@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAuth, unauthorizedResponse } from '@/lib/auth';
+import { forbiddenResponse, getCurrentUser, unauthorizedResponse } from '@/lib/auth';
+import { canManageAnyPost, canPublishDirectly } from '@/lib/permissions';
 import { withAuditLog } from '@/lib/audit';
 import { normalizePostSlug, slugifyTag, validatePostInput } from '@/lib/post-content';
 
@@ -26,7 +27,8 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!(await requireAuth())) return unauthorizedResponse();
+  const user = await getCurrentUser();
+  if (!user) return unauthorizedResponse();
 
   try {
     const { id } = await params;
@@ -34,6 +36,8 @@ export async function GET(
       where: { id },
       include: {
         tags: true,
+        author: { select: { id: true, username: true, displayName: true } },
+        reviewer: { select: { id: true, username: true, displayName: true } },
       },
     });
 
@@ -42,6 +46,10 @@ export async function GET(
         { error: '文章不存在' },
         { status: 404 }
       );
+    }
+
+    if (!canManageAnyPost(user) && post.authorId !== user.id) {
+      return forbiddenResponse();
     }
 
     return NextResponse.json(post);
@@ -59,7 +67,8 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!(await requireAuth())) return unauthorizedResponse();
+  const user = await getCurrentUser();
+  if (!user) return unauthorizedResponse();
 
   try {
     const { id } = await params;
@@ -91,8 +100,32 @@ export async function PUT(
       include: { tags: true },
     });
 
+    if (!currentPost) {
+      return NextResponse.json({ error: '文章不存在' }, { status: 404 });
+    }
+
+    if (!canManageAnyPost(user) && currentPost.authorId !== user.id) {
+      return forbiddenResponse();
+    }
+
+    // Author edits never change publish state — they must go through the
+    // submit/review flow. Editor+ can flip published directly.
+    const allowDirectPublish = canPublishDirectly(user);
+    const nextPublished = allowDirectPublish
+      ? (body.published ?? currentPost.published)
+      : currentPost.published;
+    const nextStatus = allowDirectPublish
+      ? ((body.published ?? currentPost.published) ? 'published' : (currentPost.status === 'published' ? 'draft' : currentPost.status))
+      : (currentPost.status === 'rejected' ? 'draft' : currentPost.status);
+    const nextIsPinned = allowDirectPublish
+      ? (body.isPinned ?? currentPost.isPinned)
+      : currentPost.isPinned;
+    const nextIsPublic = allowDirectPublish
+      ? (body.isPublic ?? currentPost.isPublic)
+      : currentPost.isPublic;
+
     // 保存当前状态为新版本（如果有内容变化）
-    if (currentPost) {
+    {
       const maxVersion = await prisma.postVersion.aggregate({
         where: { postId: id },
         _max: { version: true },
@@ -130,10 +163,13 @@ export async function PUT(
           canonicalUrl: canonicalUrl || null,
           ogImage: ogImage || null,
           noIndex,
-          published: body.published ?? true,
-          isPublic: body.isPublic ?? true,
-          isPinned: body.isPinned ?? false,
-          scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : null,
+          published: nextPublished,
+          status: nextStatus,
+          isPublic: nextIsPublic,
+          isPinned: nextIsPinned,
+          scheduledAt: allowDirectPublish
+            ? (body.scheduledAt ? new Date(body.scheduledAt) : null)
+            : currentPost.scheduledAt,
           updatedAt: new Date(),
           tags: {
             set: [],
@@ -150,7 +186,7 @@ export async function PUT(
           tags: true,
         },
       }),
-      () => currentPost ? { title: currentPost.title, published: currentPost.published } : null,
+      () => ({ title: currentPost.title, published: currentPost.published, status: currentPost.status }),
       (result) => ({ id: result.id, title: result.title, published: result.published })
     );
 
@@ -171,15 +207,24 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!(await requireAuth())) return unauthorizedResponse();
+  const user = await getCurrentUser();
+  if (!user) return unauthorizedResponse();
 
   try {
     const { id } = await params;
-    
+
     const currentPost = await prisma.post.findUnique({
       where: { id },
-      select: { id: true, title: true },
+      select: { id: true, title: true, authorId: true },
     });
+
+    if (!currentPost) {
+      return NextResponse.json({ error: '文章不存在' }, { status: 404 });
+    }
+
+    if (!canManageAnyPost(user) && currentPost.authorId !== user.id) {
+      return forbiddenResponse();
+    }
 
     // 先删除评论
     await prisma.comment.deleteMany({

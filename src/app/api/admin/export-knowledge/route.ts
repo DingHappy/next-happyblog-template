@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAuth, unauthorizedResponse } from '@/lib/auth';
+import { requirePermission } from '@/lib/permissions';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -32,9 +32,8 @@ function slugify(text: string): string {
 }
 
 export async function GET() {
-  if (!await requireAuth()) {
-    return unauthorizedResponse();
-  }
+  const auth = await requirePermission('knowledge:sync');
+  if (!auth.ok) return auth.response;
   
   try {
     const posts = await prisma.post.findMany({
@@ -72,9 +71,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!await requireAuth()) {
-    return unauthorizedResponse();
-  }
+  const auth = await requirePermission('knowledge:sync');
+  if (!auth.ok) return auth.response;
   
   try {
     const body = await request.json();

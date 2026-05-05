@@ -1,15 +1,14 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAuth, unauthorizedResponse } from '@/lib/auth';
 import { withAuditLog } from '@/lib/audit';
+import { requirePermission } from '@/lib/permissions';
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!await requireAuth()) {
-    return unauthorizedResponse();
-  }
+  const auth = await requirePermission('taxonomy:manage');
+  if (!auth.ok) return auth.response;
   
   try {
     const { id } = await params;
@@ -77,9 +76,8 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!await requireAuth()) {
-    return unauthorizedResponse();
-  }
+  const auth = await requirePermission('taxonomy:manage');
+  if (!auth.ok) return auth.response;
   
   try {
     const { id } = await params;

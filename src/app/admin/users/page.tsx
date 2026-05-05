@@ -9,7 +9,7 @@ interface User {
   id: string;
   username: string;
   email: string | null;
-  role: 'superadmin' | 'admin' | 'author';
+  role: 'superadmin' | 'admin' | 'editor' | 'author';
   displayName: string | null;
   avatar: string | null;
   bio: string | null;
@@ -20,12 +20,14 @@ interface User {
 const roleLabels: Record<string, string> = {
   superadmin: '超级管理员',
   admin: '管理员',
+  editor: '编辑',
   author: '作者',
 };
 
 const roleColors: Record<string, string> = {
   superadmin: 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300',
   admin: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300',
+  editor: 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300',
   author: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
 };
 
@@ -40,7 +42,7 @@ export default function AdminUsers() {
     username: '',
     email: '',
     password: '',
-    role: 'author' as 'superadmin' | 'admin' | 'author',
+    role: 'author' as 'superadmin' | 'admin' | 'editor' | 'author',
     displayName: '',
     bio: '',
   });
@@ -349,10 +351,11 @@ export default function AdminUsers() {
                 </label>
                 <select
                   value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value as 'author' | 'admin' | 'superadmin' })}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value as 'author' | 'editor' | 'admin' | 'superadmin' })}
                   className="w-full px-4 py-2 border border-gray-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="author">作者</option>
+                  <option value="editor">编辑</option>
                   <option value="admin">管理员</option>
                   <option value="superadmin">超级管理员</option>
                 </select>

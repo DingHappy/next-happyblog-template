@@ -23,6 +23,16 @@ describe('permissions', () => {
     expect(userCan(buildUser('admin'), 'content:manage')).toBe(true);
   });
 
+  it('editor can review and manage content but not sync knowledge or users', () => {
+    expect(userCan(buildUser('editor'), 'content:manage')).toBe(true);
+    expect(userCan(buildUser('editor'), 'content:review')).toBe(true);
+    expect(userCan(buildUser('editor'), 'comments:moderate')).toBe(true);
+    expect(userCan(buildUser('editor'), 'taxonomy:manage')).toBe(true);
+    expect(userCan(buildUser('editor'), 'media:manage')).toBe(true);
+    expect(userCan(buildUser('editor'), 'knowledge:sync')).toBe(false);
+    expect(userCan(buildUser('editor'), 'users:manage')).toBe(false);
+  });
+
   it('author is limited to own content and analytics', () => {
     expect(userCan(buildUser('author'), 'content:manage')).toBe(true);
     expect(userCan(buildUser('author'), 'comments:moderate')).toBe(false);

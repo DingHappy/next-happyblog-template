@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAuth, unauthorizedResponse } from '@/lib/auth';
+import { requirePermission } from '@/lib/permissions';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
@@ -23,6 +23,7 @@ interface MarkdownFile {
   category: string;
   published: boolean;
   isPublic: boolean;
+  status: string;
   hash: string;
   coverImage?: string;
   tags?: string[];
@@ -168,6 +169,7 @@ function parseMarkdown(filePath: string): MarkdownFile {
   // 发布状态和公开可见是两个不同字段：
   // published 控制是否发布；isPublic 控制普通访客是否可见。
   const published = asBoolean(fm.published) ?? true;
+  const status = published ? 'published' : 'draft';
   let isPublic =
     asBoolean(fm.isPublic) ??
     asBoolean(fm.public) ??
@@ -208,6 +210,7 @@ function parseMarkdown(filePath: string): MarkdownFile {
     category,
     published,
     isPublic,
+    status,
     hash,
     coverImage,
     tags,
@@ -282,9 +285,8 @@ async function buildUniquePostSlug(title: string, postId?: string) {
 const SKIP_FILES = new Set(['index.md', 'readme.md', '_index.md', 'README.md']);
 
 export async function POST(request: Request) {
-  if (!(await requireAuth())) {
-    return unauthorizedResponse();
-  }
+  const auth = await requirePermission('knowledge:sync');
+  if (!auth.ok) return auth.response;
 
   try {
     const body = await request.json().catch(() => ({}));
@@ -329,6 +331,7 @@ export async function POST(request: Request) {
             existing.sourceHash === parsed.hash &&
             existing.sourcePath === parsed.sourcePath &&
             existing.published === parsed.published &&
+            existing.status === parsed.status &&
             existing.isPublic === parsed.isPublic
           ) {
             skipped++;
@@ -350,6 +353,7 @@ export async function POST(request: Request) {
               sourceHash: parsed.hash,
               sourcePath: parsed.sourcePath,
               published: parsed.published,
+              status: parsed.status,
               isPublic: parsed.isPublic,
               coverImage: parsed.coverImage || null,
               categoryId: category.id,
@@ -374,6 +378,7 @@ export async function POST(request: Request) {
               sourcePath: parsed.sourcePath,
               categoryId: category.id,
               published: parsed.published,
+              status: parsed.status,
               isPublic: parsed.isPublic,
               coverImage: parsed.coverImage || null,
               tags:

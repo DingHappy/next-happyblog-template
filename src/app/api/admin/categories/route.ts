@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import type { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
-import { requireAuth, unauthorizedResponse } from '@/lib/auth';
+import { getCurrentUser, unauthorizedResponse } from '@/lib/auth';
 import { withAuditLog } from '@/lib/audit';
+import { requirePermission } from '@/lib/permissions';
 
 type CategoryWithCount = Prisma.CategoryGetPayload<{
   include: {
@@ -43,9 +44,8 @@ async function buildCategoryTree(parentId: string | null = null): Promise<Catego
 }
 
 export async function GET() {
-  if (!await requireAuth()) {
-    return unauthorizedResponse();
-  }
+  const user = await getCurrentUser();
+  if (!user) return unauthorizedResponse();
   
   try {
     const tree = await buildCategoryTree(null);
@@ -60,9 +60,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!await requireAuth()) {
-    return unauthorizedResponse();
-  }
+  const auth = await requirePermission('taxonomy:manage');
+  if (!auth.ok) return auth.response;
   
   try {
     const body = await request.json();

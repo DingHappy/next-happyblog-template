@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAuth } from '@/lib/auth';
+import { getCurrentUser, unauthorizedResponse } from '@/lib/auth';
+import { canPublishDirectly } from '@/lib/permissions';
 import { slugify } from '@/lib/slug';
 
 // POST /api/admin/posts/import - 从 Markdown 导入文章
 export async function POST(request: Request) {
   try {
-    await requireAuth();
+    const user = await getCurrentUser();
+    if (!user) return unauthorizedResponse();
 
     const formData = await request.formData();
     const file = formData.get('file') as File;
@@ -74,6 +76,9 @@ export async function POST(request: Request) {
         isPublic = publicMatch[1] === 'true';
       }
     }
+    const allowDirectPublish = canPublishDirectly(user);
+    published = allowDirectPublish ? published : false;
+    const status = published ? 'published' : 'draft';
 
     // 处理分类
     let categoryId = null;
@@ -118,7 +123,9 @@ export async function POST(request: Request) {
         excerpt,
         categoryId,
         published,
+        status,
         isPublic,
+        authorId: user.id,
         tags: {
           connectOrCreate: tagConnectOrCreate,
         },

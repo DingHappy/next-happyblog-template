@@ -4,7 +4,7 @@ import { headers } from 'next/headers';
 
 type AuditJson = Record<string, unknown>;
 
-export type AuditAction = 'create' | 'update' | 'delete' | 'login' | 'logout' | 'publish' | 'unpublish' | 'approve' | 'reject' | 'export' | 'import' | 'backup' | 'restore';
+export type AuditAction = 'create' | 'update' | 'delete' | 'login' | 'logout' | 'publish' | 'unpublish' | 'submit' | 'approve' | 'reject' | 'export' | 'import' | 'backup' | 'restore';
 export type AuditResource = 'post' | 'comment' | 'category' | 'tag' | 'user' | 'setting' | 'media' | 'system' | 'session';
 
 export interface AuditLogData {

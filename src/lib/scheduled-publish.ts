@@ -27,6 +27,7 @@ export async function publishDuePosts(now = new Date()) {
     },
     data: {
       published: true,
+      status: 'published',
       scheduledAt: null,
     },
   });

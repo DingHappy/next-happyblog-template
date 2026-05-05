@@ -9,7 +9,7 @@ const BCRYPT_ROUNDS = 12;
 const DEFAULT_PASSWORD_HASH =
   '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9'; // sha256("admin123")
 
-export type UserRole = 'superadmin' | 'admin' | 'author';
+export type UserRole = 'superadmin' | 'admin' | 'editor' | 'author';
 
 export interface AuthUser {
   id: string;
@@ -21,8 +21,9 @@ export interface AuthUser {
 }
 
 const ROLES: Record<UserRole, UserRole[]> = {
-  superadmin: ['superadmin', 'admin', 'author'],
-  admin: ['admin', 'author'],
+  superadmin: ['superadmin', 'admin', 'editor', 'author'],
+  admin: ['admin', 'editor', 'author'],
+  editor: ['editor', 'author'],
   author: ['author'],
 };
 

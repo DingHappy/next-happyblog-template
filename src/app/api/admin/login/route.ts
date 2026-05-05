@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import {
   createSession,
-  createLegacySession,
-  verifyPassword,
   verifyPasswordAgainstHash,
   hashPassword,
   shouldUpgradePasswordHash,
@@ -14,17 +12,18 @@ import { getClientIp, rateLimit } from '@/lib/rate-limit';
 export async function POST(request: Request) {
   try {
     const { username, password } = await request.json();
+    const identifier = typeof username === 'string' ? username.trim() : '';
 
-    if (!password) {
+    if (!identifier || !password) {
       return NextResponse.json(
-        { error: '请输入密码' },
+        { error: '请输入用户名和密码' },
         { status: 400 }
       );
     }
 
     // 登录限流：同 IP + 用户名 15 分钟最多 10 次尝试，防爆破
     const ip = getClientIp(request) ?? 'unknown';
-    const limitKey = `login:${ip}:${username ?? '_legacy'}`;
+    const limitKey = `login:${ip}:${identifier.toLowerCase()}`;
     const limited = rateLimit({ key: limitKey, limit: 10, windowMs: 15 * 60 * 1000 });
     if (!limited.ok) {
       return NextResponse.json(
@@ -38,47 +37,39 @@ export async function POST(request: Request) {
 
     await ensureDefaultUser();
 
-    let userId: string | null = null;
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { username: identifier },
+          { email: identifier },
+        ],
+      },
+    });
 
-    if (username) {
-      const user = await prisma.user.findUnique({
-        where: { username },
-      });
-
-      if (!user || !verifyPasswordAgainstHash(password, user.password)) {
-        return NextResponse.json(
-          { error: '用户名或密码错误' },
-          { status: 401 }
-        );
-      }
-
-      if (shouldUpgradePasswordHash(user.password)) {
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { password: hashPassword(password) },
-        });
-      }
-
-      userId = user.id;
-    } else {
-      if (!await verifyPassword(password)) {
-        return NextResponse.json(
-          { error: '密码错误' },
-          { status: 401 }
-        );
-      }
-
-      const adminUser = await prisma.user.findFirst({
-        where: { role: 'superadmin' },
-      });
-      userId = adminUser?.id || null;
+    if (!user || !verifyPasswordAgainstHash(password, user.password)) {
+      return NextResponse.json(
+        { error: '用户名或密码错误' },
+        { status: 401 }
+      );
     }
 
-    const sessionId = userId
-      ? await createSession(userId)
-      : await createLegacySession();
+    if (shouldUpgradePasswordHash(user.password)) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { password: hashPassword(password) },
+      });
+    }
 
-    const response = NextResponse.json({ success: true });
+    const sessionId = await createSession(user.id);
+
+    const response = NextResponse.json({
+      success: true,
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+      },
+    });
     response.cookies.set('admin_session', sessionId, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',

@@ -3,7 +3,8 @@ import { Suspense } from 'react';
 import type { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { redirect } from 'next/navigation';
-import { requireAuth } from '@/lib/auth';
+import { getCurrentUser } from '@/lib/auth';
+import { canManageAnyPost } from '@/lib/permissions';
 import AdminSidebar from '@/components/AdminSidebar';
 import AdminPostsTable from '@/components/AdminPostsTable';
 import type { AdminPostFilters } from '@/components/AdminPostsTable';
@@ -22,7 +23,17 @@ type AdminPostsSearchParams = {
   page?: string;
 };
 
-const statusFilters = new Set(['all', 'published', 'draft', 'scheduled', 'public', 'private', 'pinned']);
+const statusFilters = new Set([
+  'all',
+  'published',
+  'draft',
+  'scheduled',
+  'pending',
+  'rejected',
+  'public',
+  'private',
+  'pinned',
+]);
 const sortOptions = new Set([
   'createdAt-desc',
   'createdAt-asc',
@@ -81,9 +92,14 @@ function buildPostWhere(filters: AdminPostFilters): Prisma.PostWhereInput {
   } else if (filters.status === 'draft') {
     where.published = false;
     where.scheduledAt = null;
+    where.status = 'draft';
   } else if (filters.status === 'scheduled') {
     where.published = false;
     where.scheduledAt = { not: null };
+  } else if (filters.status === 'pending') {
+    where.status = 'pending';
+  } else if (filters.status === 'rejected') {
+    where.status = 'rejected';
   } else if (filters.status === 'public') {
     where.isPublic = true;
   } else if (filters.status === 'private') {
@@ -126,12 +142,16 @@ export default async function AdminPosts({
 }: {
   searchParams: Promise<AdminPostsSearchParams>;
 }) {
-  if (!(await requireAuth())) {
+  const user = await getCurrentUser();
+  if (!user) {
     redirect('/admin');
   }
 
   const filters = parseFilters(await searchParams);
   const where = buildPostWhere(filters);
+  if (!canManageAnyPost(user)) {
+    where.authorId = user.id;
+  }
   const orderBy = buildPostOrderBy(filters.sort);
 
   const [posts, filteredCount, totalPosts, categories, tags] = await Promise.all([
@@ -153,13 +173,18 @@ export default async function AdminPosts({
             slug: true,
           },
         },
+        author: {
+          select: { id: true, username: true, displayName: true },
+        },
         _count: {
           select: { comments: true },
         },
       },
     }),
     prisma.post.count({ where }),
-    prisma.post.count(),
+    prisma.post.count({
+      where: canManageAnyPost(user) ? undefined : { authorId: user.id },
+    }),
     prisma.category.findMany({
       orderBy: [
         { order: 'asc' },
@@ -192,12 +217,20 @@ export default async function AdminPosts({
     title: post.title,
     slug: post.slug,
     published: post.published,
+    status: post.status,
     isPublic: post.isPublic,
     isPinned: post.isPinned,
     scheduledAt: post.scheduledAt ? post.scheduledAt.toISOString() : null,
     createdAt: post.createdAt.toISOString(),
     updatedAt: post.updatedAt.toISOString(),
     viewCount: post.viewCount,
+    author: post.author
+      ? {
+          id: post.author.id,
+          username: post.author.username,
+          displayName: post.author.displayName,
+        }
+      : null,
     category: post.category
       ? {
           id: post.category.id,
@@ -271,6 +304,7 @@ export default async function AdminPosts({
                 totalPages,
               }}
               totalPosts={totalPosts}
+              currentUser={{ id: user.id, role: user.role }}
             />
           </Suspense>
         </main>

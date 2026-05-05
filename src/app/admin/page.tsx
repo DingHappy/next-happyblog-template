@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function AdminLogin() {
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -65,7 +66,7 @@ export default function AdminLogin() {
       const response = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ username: username.trim(), password }),
       });
 
       if (response.ok) {
@@ -100,16 +101,28 @@ export default function AdminLogin() {
             <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
               管理后台
             </h1>
-            <p className="text-gray-500 mt-2 text-sm">请输入管理密码登录</p>
+            <p className="text-gray-500 mt-2 text-sm">使用后台账号登录</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="用户名或邮箱"
+                autoComplete="username"
+                className="w-full px-5 py-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-purple-300 focus:bg-white outline-none transition-all text-gray-800 placeholder-gray-400"
+                required
+              />
+            </div>
             <div>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="请输入密码"
+                autoComplete="current-password"
                 className="w-full px-5 py-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-purple-300 focus:bg-white outline-none transition-all text-gray-800 placeholder-gray-400"
                 required
               />

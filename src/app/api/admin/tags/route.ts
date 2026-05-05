@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAuth, unauthorizedResponse } from '@/lib/auth';
 import { withAuditLog } from '@/lib/audit';
+import { requirePermission } from '@/lib/permissions';
 
 function slugify(text: string): string {
   return text
@@ -14,7 +14,8 @@ function slugify(text: string): string {
 }
 
 export async function GET() {
-  if (!(await requireAuth())) return unauthorizedResponse();
+  const auth = await requirePermission('taxonomy:manage');
+  if (!auth.ok) return auth.response;
 
   try {
     const tags = await prisma.tag.findMany({
@@ -40,7 +41,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!(await requireAuth())) return unauthorizedResponse();
+  const auth = await requirePermission('taxonomy:manage');
+  if (!auth.ok) return auth.response;
 
   try {
     const body = await request.json();
@@ -95,7 +97,8 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  if (!(await requireAuth())) return unauthorizedResponse();
+  const auth = await requirePermission('taxonomy:manage');
+  if (!auth.ok) return auth.response;
 
   try {
     const url = new URL(request.url);

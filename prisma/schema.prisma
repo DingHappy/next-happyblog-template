@@ -28,6 +28,11 @@ model Post {
   likeCount      Int                   @default(0)
   sourceHash     String? // 用于知识库同步的内容哈希检测（SHA256 截断）
   sourcePath     String?               @unique // 知识库同步的源文件相对路径（同步匹配键）
+  authorId       String? // 文章作者
+  status         String                @default("draft") // draft | pending | published | rejected
+  reviewerId     String? // 最近一次审核人
+  reviewedAt     DateTime?
+  reviewNote     String? // 驳回原因 / 审核备注
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
   tags           Tag[]
@@ -36,6 +41,8 @@ model Post {
   versions       PostVersion[]
   draft          PostDraft?
   category       Category?             @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  author         User?                 @relation("PostAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  reviewer       User?                 @relation("PostReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
   subscriptions  CommentSubscription[]
 
   @@index([title])
@@ -49,6 +56,9 @@ model Post {
   @@index([viewCount])
   @@index([updatedAt])
   @@index([noIndex])
+  @@index([authorId])
+  @@index([status])
+  @@index([status, updatedAt])
 }
 
 model PostDraft {
@@ -194,15 +204,17 @@ model User {
   username    String     @unique
   email       String?    @unique
   password    String // bcrypt hash
-  role        String     @default("author") // superadmin, admin, author
+  role        String     @default("author") // superadmin, admin, editor, author
   displayName String?
   avatar      String?
   bio         String?
   lastLoginAt DateTime?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
-  sessions    Session[]
-  auditLogs   AuditLog[]
+  sessions       Session[]
+  auditLogs      AuditLog[]
+  authoredPosts  Post[]    @relation("PostAuthor")
+  reviewedPosts  Post[]    @relation("PostReviewer")
 
   @@index([username])
   @@index([email])

@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 import sharp from 'sharp';
 import GithubSlugger from 'github-slugger';
 import prisma from '@/lib/prisma';
-import { requireAuth, unauthorizedResponse } from '@/lib/auth';
 import { withAuditLog } from '@/lib/audit';
+import { requirePermission } from '@/lib/permissions';
 import { getStorage } from '@/lib/storage';
 import { randomUUID } from 'crypto';
 import path from 'path';
@@ -13,7 +13,8 @@ const MAX_WIDTH = 2000;
 const WEBP_QUALITY = 82;
 
 export async function GET() {
-  if (!(await requireAuth())) return unauthorizedResponse();
+  const auth = await requirePermission('media:manage');
+  if (!auth.ok) return auth.response;
 
   try {
     const media = await prisma.media.findMany({
@@ -39,7 +40,8 @@ function buildKey(originalName: string): string {
 }
 
 export async function POST(request: Request) {
-  if (!(await requireAuth())) return unauthorizedResponse();
+  const auth = await requirePermission('media:manage');
+  if (!auth.ok) return auth.response;
 
   try {
     const formData = await request.formData();

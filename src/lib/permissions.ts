@@ -13,6 +13,7 @@ export type Permission =
   | 'backup:manage'
   | 'comments:moderate'
   | 'content:manage'
+  | 'content:review'
   | 'knowledge:sync'
   | 'media:manage'
   | 'settings:manage'
@@ -26,6 +27,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'backup:manage',
     'comments:moderate',
     'content:manage',
+    'content:review',
     'knowledge:sync',
     'media:manage',
     'settings:manage',
@@ -37,7 +39,17 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'audit:read',
     'comments:moderate',
     'content:manage',
+    'content:review',
     'knowledge:sync',
+    'media:manage',
+    'taxonomy:manage',
+  ],
+  editor: [
+    'analytics:read',
+    'audit:read',
+    'comments:moderate',
+    'content:manage',
+    'content:review',
     'media:manage',
     'taxonomy:manage',
   ],
@@ -55,6 +67,24 @@ export function getPermissionsForRole(role: UserRole): Permission[] {
 export function userCan(user: AuthUser | null, permission: Permission): boolean {
   if (!user) return false;
   return getPermissionsForRole(user.role).includes(permission);
+}
+
+/**
+ * Whether the user can edit/delete any post regardless of authorship.
+ * Authors are limited to their own posts; editor/admin/superadmin manage all.
+ */
+export function canManageAnyPost(user: AuthUser | null): boolean {
+  if (!user) return false;
+  return user.role !== 'author';
+}
+
+/**
+ * Whether the user may publish posts directly without going through review.
+ * Authors must submit drafts for review.
+ */
+export function canPublishDirectly(user: AuthUser | null): boolean {
+  if (!user) return false;
+  return user.role !== 'author';
 }
 
 export async function requirePermission(permission: Permission) {

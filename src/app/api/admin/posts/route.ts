@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import type { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
-import { requireAuth, unauthorizedResponse } from '@/lib/auth';
-import { withAuditLog } from '@/lib/audit';
+import { getCurrentUser, unauthorizedResponse } from '@/lib/auth';
+import { canManageAnyPost, canPublishDirectly } from '@/lib/permissions';
+import { createAuditLog, withAuditLog } from '@/lib/audit';
 import { normalizePostSlug, normalizeTagNames, slugifyTag, validatePostInput } from '@/lib/post-content';
 
 async function buildUniquePostSlug(title: string, requestedSlug?: string) {
@@ -19,10 +20,16 @@ async function buildUniquePostSlug(title: string, requestedSlug?: string) {
 
 // 获取文章列表
 export async function GET() {
-  if (!(await requireAuth())) return unauthorizedResponse();
+  const user = await getCurrentUser();
+  if (!user) return unauthorizedResponse();
 
   try {
+    const where: Prisma.PostWhereInput = canManageAnyPost(user)
+      ? {}
+      : { authorId: user.id };
+
     const posts = await prisma.post.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
@@ -30,8 +37,13 @@ export async function GET() {
         slug: true,
         published: true,
         isPublic: true,
+        status: true,
+        authorId: true,
         scheduledAt: true,
         createdAt: true,
+        author: {
+          select: { id: true, username: true, displayName: true },
+        },
       },
     });
 
@@ -47,7 +59,8 @@ export async function GET() {
 
 // 创建文章
 export async function POST(request: Request) {
-  if (!(await requireAuth())) return unauthorizedResponse();
+  const user = await getCurrentUser();
+  if (!user) return unauthorizedResponse();
 
   try {
     const body = await request.json();
@@ -72,6 +85,15 @@ export async function POST(request: Request) {
     } = validation.normalized;
     const slug = await buildUniquePostSlug(title, validation.normalized.slug);
 
+    // Authors cannot publish directly — every new post starts as a draft until
+    // explicitly submitted for review. Editors+ keep the existing behavior.
+    const requestedPublished = body.published ?? true;
+    const allowDirectPublish = canPublishDirectly(user);
+    const published = allowDirectPublish ? requestedPublished : false;
+    const status = allowDirectPublish
+      ? (requestedPublished ? 'published' : 'draft')
+      : 'draft';
+
     const post = await withAuditLog(
       { action: 'create', resource: 'post' },
       () => prisma.post.create({
@@ -87,7 +109,9 @@ export async function POST(request: Request) {
           canonicalUrl: canonicalUrl || null,
           ogImage: ogImage || null,
           noIndex,
-          published: body.published ?? true,
+          published,
+          status,
+          authorId: user.id,
           isPublic: body.isPublic ?? true,
           isPinned: body.isPinned ?? false,
           scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : null,
@@ -184,7 +208,8 @@ function batchMessage(action: BatchPostAction, count: number) {
 
 // 批量操作文章
 export async function PATCH(request: Request) {
-  if (!(await requireAuth())) return unauthorizedResponse();
+  const user = await getCurrentUser();
+  if (!user) return unauthorizedResponse();
 
   try {
     const { action, ids, postIds, categoryId, tags } = await request.json();
@@ -205,14 +230,44 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const where: Prisma.PostWhereInput = { id: { in: selectedPostIds } };
+    // Authors can only batch-operate on posts they own. Authors also cannot
+    // publish/pin directly — those actions need editor+.
+    if (!canManageAnyPost(user)) {
+      const restrictedActions: BatchPostAction[] = ['publish', 'pin', 'unpin', 'public', 'private'];
+      if (restrictedActions.includes(action)) {
+        return NextResponse.json({ error: '权限不足' }, { status: 403 });
+      }
+    }
+
+    const requestedWhere: Prisma.PostWhereInput = canManageAnyPost(user)
+      ? { id: { in: selectedPostIds } }
+      : { id: { in: selectedPostIds }, authorId: user.id };
+    const targetPosts = await prisma.post.findMany({
+      where: requestedWhere,
+      select: { id: true, title: true, published: true, status: true },
+    });
+    const targetPostIds = targetPosts.map((post) => post.id);
+    const where: Prisma.PostWhereInput = { id: { in: targetPostIds } };
+
+    if (targetPostIds.length === 0) {
+      return NextResponse.json({
+        success: true,
+        message: batchMessage(action, 0),
+        count: 0,
+      });
+    }
 
     if (action === 'delete') {
       const [, , result] = await prisma.$transaction([
-        prisma.comment.deleteMany({ where: { postId: { in: selectedPostIds } } }),
-        prisma.postView.deleteMany({ where: { postId: { in: selectedPostIds } } }),
+        prisma.comment.deleteMany({ where: { postId: { in: targetPostIds } } }),
+        prisma.postView.deleteMany({ where: { postId: { in: targetPostIds } } }),
         prisma.post.deleteMany({ where }),
       ]);
+      await createAuditLog({
+        action: 'delete',
+        resource: 'post',
+        newData: { action, count: result.count, ids: targetPostIds },
+      });
       return NextResponse.json({
         success: true,
         message: batchMessage(action, result.count),
@@ -232,6 +287,11 @@ export async function PATCH(request: Request) {
         where,
         data: { categoryId },
       });
+      await createAuditLog({
+        action: 'update',
+        resource: 'post',
+        newData: { action, count: result.count, ids: targetPostIds, categoryId },
+      });
 
       return NextResponse.json({
         success: true,
@@ -244,6 +304,11 @@ export async function PATCH(request: Request) {
       const result = await prisma.post.updateMany({
         where,
         data: { categoryId: null },
+      });
+      await createAuditLog({
+        action: 'update',
+        resource: 'post',
+        newData: { action, count: result.count, ids: targetPostIds },
       });
 
       return NextResponse.json({
@@ -330,6 +395,17 @@ export async function PATCH(request: Request) {
         );
       }
 
+      await createAuditLog({
+        action: 'update',
+        resource: 'post',
+        newData: {
+          action,
+          count: existingPosts.length,
+          ids: existingPosts.map((post) => post.id),
+          tags: tagNames,
+        },
+      });
+
       return NextResponse.json({
         success: true,
         message: batchMessage(action, existingPosts.length),
@@ -339,9 +415,9 @@ export async function PATCH(request: Request) {
 
     const data: Prisma.PostUpdateManyMutationInput =
       action === 'publish'
-        ? { published: true, scheduledAt: null }
+        ? { published: true, status: 'published', scheduledAt: null }
         : action === 'draft' || action === 'unpublish'
-          ? { published: false, scheduledAt: null }
+          ? { published: false, status: 'draft', scheduledAt: null }
           : action === 'public'
             ? { isPublic: true }
             : action === 'private'
@@ -351,6 +427,11 @@ export async function PATCH(request: Request) {
                 : { isPinned: false };
 
     const result = await prisma.post.updateMany({ where, data });
+    await createAuditLog({
+      action: action === 'publish' ? 'publish' : action === 'unpublish' || action === 'draft' ? 'unpublish' : 'update',
+      resource: 'post',
+      newData: { action, count: result.count, ids: targetPostIds },
+    });
 
     return NextResponse.json({
       success: true,
